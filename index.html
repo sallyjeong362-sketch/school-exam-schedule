@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>시험대비 학교별 시간표 메이커</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; background: #f5f5f3; min-height: 100vh; display: flex; justify-content: center; padding: 2rem 1rem; color: #2c2c2a; }
+.app { max-width: 980px; width: 100%; }
+h1 { font-size: 21px; font-weight: 600; color: #1a1a18; margin-bottom: 0.25rem; }
+.subtitle { font-size: 14px; color: #888; margin-bottom: 1.5rem; line-height: 1.6; }
+
+.tabs { display: flex; gap: 6px; margin-bottom: 1.25rem; border-bottom: 1px solid #e8e8e6; overflow-x: auto; }
+.tab-btn { background: transparent; border: none; padding: 0.65rem 0.9rem; font-size: 14px; font-weight: 500; color: #888; cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap; }
+.tab-btn:hover { color: #185FA5; }
+.tab-btn.active { color: #185FA5; border-bottom-color: #185FA5; }
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+.card { background: #fff; border: 1px solid #e8e8e6; border-radius: 14px; padding: 1.25rem 1.4rem; margin-bottom: 1.25rem; }
+.card h2 { font-size: 15px; font-weight: 600; margin-bottom: 0.75rem; color: #1a1a18; }
+.card h3 { font-size: 13px; font-weight: 600; margin: 1rem 0 0.5rem; color: #444; }
+.hint { font-size: 12.5px; color: #999; line-height: 1.6; margin-bottom: 0.75rem; }
+.hint code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; background: #f1f1ef; padding: 1px 5px; border-radius: 4px; color: #555; }
+
+label { font-size: 13px; color: #555; }
+input[type=text], input[type=number], input[type=time], select, textarea { font: inherit; font-size: 14px; border: 1px solid #ddd; border-radius: 8px; padding: 0.45rem 0.6rem; background: #fff; color: #2c2c2a; }
+input:focus, select:focus, textarea:focus { outline: none; border-color: #185FA5; box-shadow: 0 0 0 3px rgba(24,95,165,0.12); }
+textarea { width: 100%; resize: vertical; line-height: 1.6; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; }
+
+.btn { font: inherit; font-size: 13.5px; font-weight: 500; border: 1px solid #ddd; background: #fff; color: #333; border-radius: 8px; padding: 0.45rem 0.85rem; cursor: pointer; }
+.btn:hover { border-color: #185FA5; color: #185FA5; }
+.btn.primary { background: #185FA5; border-color: #185FA5; color: #fff; }
+.btn.primary:hover { background: #134d87; color: #fff; }
+.btn.danger:hover { border-color: #c0392b; color: #c0392b; }
+.btn.small { font-size: 12px; padding: 0.25rem 0.55rem; }
+.row { display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: center; }
+.row + .row { margin-top: 0.6rem; }
+
+.grid-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 0.8rem 1rem; }
+.field { display: flex; flex-direction: column; gap: 4px; }
+.field small { color: #aaa; font-size: 11.5px; }
+
+table.simple { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+table.simple th, table.simple td { border-bottom: 1px solid #eee; padding: 0.45rem 0.4rem; text-align: left; vertical-align: middle; }
+table.simple th { font-size: 12px; color: #888; font-weight: 500; }
+table.simple input[type=text] { width: 100%; }
+
+.student { border: 1px solid #ececea; border-radius: 12px; padding: 0.9rem 1rem; margin-bottom: 0.8rem; background: #fcfcfb; }
+.student .head { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.55rem; flex-wrap: wrap; }
+.student .head input.name { width: 120px; }
+.student .head input.school { width: 150px; }
+.student .head .spacer { flex: 1; }
+.chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 0.5rem; }
+.chip { font-size: 12px; padding: 2px 8px; border-radius: 999px; background: #eef3fa; color: #185FA5; }
+.chip.err { background: #fdecea; color: #c0392b; }
+.chip.muted { background: #f1f1ef; color: #888; }
+.dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+
+.empty-note { font-size: 13.5px; color: #999; padding: 1rem 0; text-align: center; }
+.badge { display: inline-block; font-size: 11.5px; font-weight: 600; padding: 1px 7px; border-radius: 999px; background: #eef3fa; color: #185FA5; margin-left: 4px; }
+.badge.ok { background: #e7f6ec; color: #1e8449; }
+.badge.warn { background: #fff4e0; color: #b9770e; }
+.badge.bad { background: #fdecea; color: #c0392b; }
+
+/* result */
+.school-card { border-left: 5px solid #ccc; }
+.session { display: flex; gap: 0.8rem; align-items: flex-start; padding: 0.6rem 0; border-bottom: 1px dashed #eee; flex-wrap: wrap; }
+.session:last-child { border-bottom: none; }
+.session .when { font-weight: 600; min-width: 150px; }
+.session .who { flex: 1; font-size: 13px; line-height: 1.7; min-width: 220px; }
+.miss { color: #c0392b; }
+.reason { color: #999; font-size: 12px; }
+details { margin-top: 0.6rem; }
+details summary { cursor: pointer; font-size: 13px; color: #185FA5; }
+.alt-list { margin-top: 0.4rem; }
+.alt { display: flex; gap: 0.6rem; align-items: center; font-size: 13px; padding: 0.3rem 0; flex-wrap: wrap; }
+.alt .when { min-width: 140px; font-weight: 500; }
+
+/* weekly grid */
+.week-wrap { overflow-x: auto; padding-bottom: 10px; }
+.week { display: grid; grid-template-columns: 52px repeat(7, minmax(92px, 1fr)); min-width: 720px; }
+.week .dayhead { text-align: center; font-size: 13px; font-weight: 600; padding: 0.4rem 0; border-bottom: 1px solid #e8e8e6; }
+.week .col { position: relative; border-left: 1px solid #f0f0ee; }
+.week .col.closed { background: repeating-linear-gradient(45deg, #fafaf9, #fafaf9 6px, #f3f3f1 6px, #f3f3f1 12px); }
+.week .open { position: absolute; left: 0; right: 0; background: #fff; }
+.week .tick { position: absolute; left: 0; right: 0; border-top: 1px solid #f0f0ee; }
+.week .tlabel { position: absolute; right: 6px; font-size: 11px; color: #aaa; transform: translateY(-50%); }
+.week .ev { position: absolute; left: 3px; right: 3px; border-radius: 6px; padding: 3px 5px; font-size: 11.5px; line-height: 1.35; color: #fff; overflow: hidden; box-shadow: 0 1px 2px rgba(0,0,0,0.08); }
+.week .ev.makeup { background: #fff !important; border: 2px dashed; color: #333; }
+.week .ev b { display: block; font-size: 12px; }
+
+/* heatmap */
+.heat { border-collapse: collapse; font-size: 12px; margin-top: 0.5rem; }
+.heat th { font-weight: 500; color: #888; padding: 3px 6px; }
+.heat td { width: 70px; height: 24px; text-align: center; border: 2px solid #fff; border-radius: 4px; cursor: pointer; color: #333; }
+.heat td.closed { background: #f6f6f4; color: #ccc; cursor: default; }
+.heat td.sel { outline: 2px solid #185FA5; }
+.legend { display: flex; gap: 0.8rem; flex-wrap: wrap; font-size: 12.5px; color: #555; margin-bottom: 0.6rem; }
+
+.notice { background: #fff8e6; border: 1px solid #f5dfa6; color: #7d5a00; border-radius: 10px; padding: 0.7rem 0.9rem; font-size: 13px; line-height: 1.6; margin-bottom: 1rem; }
+
+@media print {
+  body { background: #fff; padding: 0; }
+  .tabs, .no-print, details { display: none !important; }
+  .tab-panel { display: none !important; }
+  #tab-result { display: block !important; }
+  .card { border: none; padding: 0.5rem 0; break-inside: avoid; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <h1>시험대비 학교별 시간표 메이커</h1>
+  <p class="subtitle">학생마다 다른 학원 시간표와 이동시간을 넣으면, 학교별로 모두 모일 수 있는 시험대비 수업 시간을 찾아주고<br>다 못 모이면 대안·보강 시간을 제안해요.</p>
+
+  <div class="tabs no-print">
+    <button class="tab-btn active" data-tab="settings">① 기본 설정</button>
+    <button class="tab-btn" data-tab="students">② 학생 · 타학원 시간표 <span class="badge" id="stuCount">0</span></button>
+    <button class="tab-btn" data-tab="result">③ 시간표 결과</button>
+    <button class="tab-btn" data-tab="heat">④ 가용시간 한눈에 보기</button>
+  </div>
+
+  <!-- ① settings -->
+  <section class="tab-panel active" id="tab-settings">
+    <div class="card">
+      <h2>수업 조건</h2>
+      <div class="grid-form">
+        <div class="field"><label>수업 1회 길이 (분)</label><input type="number" id="setDuration" min="30" step="10"><small>예: 90 → 1시간 30분 수업</small></div>
+        <div class="field"><label>시작 시각 단위 (분)</label><select id="setStep"><option value="10">10분</option><option value="15">15분</option><option value="30">30분</option><option value="60">60분</option></select><small>수업 시작 시간을 몇 분 간격으로 찾을지</small></div>
+        <div class="field"><label>기본 이동시간 (분)</label><input type="number" id="setTravel" min="0" step="5"><small>타학원 ↔ 우리학원. 학원별로 따로 적을 수도 있어요</small></div>
+        <div class="field"><label>학교별 주당 수업 횟수</label><input type="number" id="setSessions" min="1" max="7"><small>학교마다 다르게 하려면 아래 표에서</small></div>
+        <div class="field"><label>동시에 열 수 있는 수업 수</label><input type="number" id="setRooms" min="1" max="10"><small>강의실·선생님 수. 1이면 학교끼리 시간이 안 겹치게</small></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>우리 학원 수업 가능 시간</h2>
+      <p class="hint">요일별로 시험대비 수업을 열 수 있는 시간대를 적어주세요. 여러 구간은 쉼표로: <code>14:00-17:00, 18:00-22:00</code> · 비우면 그 요일은 수업 없음</p>
+      <table class="simple" id="hoursTable"></table>
+    </div>
+
+    <div class="card">
+      <h2>학교별 설정</h2>
+      <p class="hint">학생 탭에 입력한 학교가 자동으로 나타나요. <b>하교 후 도착 가능 시각</b>은 그 학교 학생이 학교 끝나고 우리 학원에 올 수 있는 가장 빠른 시각이에요 (시험 기간 단축수업이면 당겨주세요).</p>
+      <div id="schoolTableWrap"></div>
+    </div>
+
+    <div class="card no-print">
+      <h2>데이터</h2>
+      <p class="hint">입력한 내용은 이 브라우저에 자동 저장돼요. 다른 컴퓨터로 옮기려면 파일로 내보내 주세요.</p>
+      <div class="row">
+        <button class="btn" id="btnSample">예시 데이터 불러오기</button>
+        <button class="btn" id="btnExport">파일로 내보내기</button>
+        <button class="btn" id="btnImport">파일 불러오기</button>
+        <input type="file" id="importFile" accept="application/json,.json" hidden>
+        <button class="btn danger" id="btnReset">전체 초기화</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ② students -->
+  <section class="tab-panel" id="tab-students">
+    <div class="card">
+      <h2>타학원 시간표 입력 방법</h2>
+      <p class="hint" style="margin-bottom:0.4rem">한 줄에 하나씩 <code>요일 시작-끝 학원이름 이동N</code> 형식으로 적으면 돼요.</p>
+      <p class="hint" style="margin-bottom:0">
+        <code>월수금 17:00-19:00 수학학원</code> &nbsp; <code>화목 18:30-21:00 영어 이동20</code> &nbsp; <code>평일 16:00-17:00 피아노 이동5</code> &nbsp; <code>토 10-13 과학</code><br>
+        · 요일은 <code>월화수목금토일</code>, <code>평일</code>, <code>주말</code>, <code>매일</code> 사용 가능 · <code>이동20</code> = 그 학원과 우리학원 사이 이동 20분 (안 적으면 기본 이동시간)<br>
+        · 학원이 아닌 일정(병원, 과외 등)도 똑같이 적으면 돼요. 집에서 하는 과외처럼 이동이 없으면 <code>이동0</code>
+      </p>
+    </div>
+
+    <div class="card">
+      <div class="row" style="justify-content:space-between;margin-bottom:0.8rem">
+        <h2 style="margin:0">학생 목록</h2>
+        <div class="row">
+          <input type="text" id="filterSchool" placeholder="학교/이름 검색" style="width:150px">
+          <button class="btn primary" id="btnAddStudent">+ 학생 추가</button>
+        </div>
+      </div>
+      <datalist id="schoolOptions"></datalist>
+      <div id="studentList"></div>
+    </div>
+
+    <div class="card">
+      <h2>여러 명 한꺼번에 붙여넣기</h2>
+      <p class="hint">학생마다 첫 줄에 <code>이름 / 학교</code>, 그 아래에 타학원 시간표를 적어요. 카톡으로 받은 내용을 정리해서 붙여넣기 좋아요.</p>
+      <textarea id="bulkText" rows="8" placeholder="김민수 / 대치중
+월수 17:00-19:00 수학학원 이동15
+화목 18:00-20:00 영어학원
+
+이서연 / 단대부중
+평일 16:00-17:30 피아노 이동5"></textarea>
+      <div class="row" style="margin-top:0.6rem">
+        <button class="btn primary" id="btnBulk">학생 추가하기</button>
+        <span class="hint" id="bulkMsg" style="margin:0"></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ③ result -->
+  <section class="tab-panel" id="tab-result">
+    <div class="row no-print" style="margin-bottom:1rem">
+      <button class="btn primary" id="btnReplan">자동 배정 다시 하기</button>
+      <button class="btn" onclick="window.print()">인쇄 / PDF 저장</button>
+      <span class="hint" style="margin:0">대안 시간의 <b>교체</b> 버튼으로 직접 바꾼 회차는 고정돼요. "자동 배정 다시 하기"를 누르면 모두 풀려요.</span>
+    </div>
+    <div id="resultWrap"></div>
+  </section>
+
+  <!-- ④ heatmap -->
+  <section class="tab-panel" id="tab-heat">
+    <div class="card">
+      <h2>학교별 가용 인원 지도</h2>
+      <p class="hint">칸에 적힌 숫자는 <b>그 시각에 수업을 시작하면</b> (수업 길이 + 이동시간을 반영해서) 올 수 있는 학생 수예요. 칸을 누르면 누가 왜 못 오는지 보여줘요.</p>
+      <div class="row"><label>학교</label><select id="heatSchool"></select></div>
+      <div id="heatWrap" style="overflow-x:auto"></div>
+      <div id="heatDetail" style="margin-top:1rem"></div>
+    </div>
+  </section>
+</div>
+
+<script>
+/* ---------------- constants & helpers ---------------- */
+const STORAGE_KEY = 'examScheduleData';
+const DAYS = ['월', '화', '수', '목', '금', '토', '일'];
+const COLORS = ['#185FA5', '#1e8449', '#b9461e', '#7d3c98', '#b9770e', '#117a8b', '#c0392b', '#5d6d7e', '#a04000', '#2e4053'];
+
+function genId() { return 's_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+function toMin(h, m) { return (+h) * 60 + (+(m || 0)); }
+function parseClock(s) {
+  const m = /^\s*(\d{1,2})(?::(\d{2}))?\s*$/.exec(s || '');
+  if (!m || +m[1] > 24 || +(m[2] || 0) > 59) return null;
+  return toMin(m[1], m[2]);
+}
+function fmt(min) { return String(Math.floor(min / 60)).padStart(2, '0') + ':' + String(min % 60).padStart(2, '0'); }
+function fmtRange(day, s, e) { return `${DAYS[day]} ${fmt(s)}~${fmt(e)}`; }
+function naturalCompare(a, b) { return a.localeCompare(b, 'ko', { numeric: true }); }
+
+/* ---------------- state ---------------- */
+function defaultState() {
+  return {
+    settings: { duration: 90, step: 30, travel: 15, sessions: 2, rooms: 1 },
+    hours: ['15:00-22:00', '15:00-22:00', '15:00-22:00', '15:00-22:00', '15:00-22:00', '10:00-18:00', ''],
+    schoolCfg: {},   // name -> { arrive, weekendArrive, sessions }
+    students: [],    // { id, name, school, text }
+    pins: {},        // school -> ["day-start", ...] manually chosen sessions
+  };
+}
+let state = loadState();
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) return Object.assign(defaultState(), JSON.parse(raw));
+  } catch (e) { /* fall through */ }
+  return defaultState();
+}
+function save() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) { /* storage unavailable */ }
+}
+function schoolCfg(name) {
+  if (!state.schoolCfg[name]) state.schoolCfg[name] = { arrive: '16:30', weekendArrive: '09:00', sessions: '' };
+  return state.schoolCfg[name];
+}
+function schoolNames() {
+  return Array.from(new Set(state.students.map(s => (s.school || '').trim()).filter(Boolean))).sort(naturalCompare);
+}
+function schoolColor(name) {
+  const i = schoolNames().indexOf(name);
+  return COLORS[(i < 0 ? 0 : i) % COLORS.length];
+}
+
+/* ---------------- parsing ---------------- */
+// "월수금 17:00-19:00 수학학원 이동20" -> [{ day, s, e, label, travel }]
+const RANGE_RE = /(\d{1,2})(?:[:시]\s*(\d{2})?\s*분?)?\s*[-~–]\s*(\d{1,2})(?:[:시]\s*(\d{2})?\s*분?)?/;
+function parseScheduleLine(line) {
+  let rest = line.trim();
+  if (!rest || rest.startsWith('#')) return { blocks: [] };
+  let travel = null;
+  const tm = /이동\s*(\d+)\s*분?/.exec(rest);
+  if (tm) { travel = +tm[1]; rest = rest.replace(tm[0], ' '); }
+  const rm = RANGE_RE.exec(rest);
+  if (!rm) return { error: `시간을 못 찾았어요: "${line.trim()}"` };
+  const s = toMin(rm[1], rm[2]), e = toMin(rm[3], rm[4]);
+  if (e <= s || e > 24 * 60) return { error: `시간 범위가 이상해요: "${line.trim()}"` };
+  const before = rest.slice(0, rm.index), after = rest.slice(rm.index + rm[0].length);
+  const days = new Set();
+  const dayPart = before.replace(/평일/g, () => { [0, 1, 2, 3, 4].forEach(d => days.add(d)); return ''; })
+    .replace(/주말/g, () => { days.add(5); days.add(6); return ''; })
+    .replace(/매일/g, () => { [0, 1, 2, 3, 4, 5, 6].forEach(d => days.add(d)); return ''; });
+  let leftover = '';
+  for (const ch of dayPart.replace(/요일/g, '')) {
+    const d = DAYS.indexOf(ch);
+    if (d >= 0) days.add(d);
+    else if (!/[\s,·/]/.test(ch)) leftover += ch;
+  }
+  if (!days.size) return { error: `요일을 못 찾았어요: "${line.trim()}"` };
+  const label = (leftover + ' ' + after).replace(/\s+/g, ' ').trim() || '타학원';
+  return { blocks: [...days].sort().map(day => ({ day, s, e, label, travel })) };
+}
+function parseSchedule(text) {
+  const blocks = [], errors = [];
+  (text || '').split('\n').forEach(line => {
+    const r = parseScheduleLine(line);
+    if (r.error) errors.push(r.error); else blocks.push(...r.blocks);
+  });
+  return { blocks, errors };
+}
+function parseHours(text) {
+  const out = [];
+  (text || '').split(',').forEach(part => {
+    if (!part.trim()) return;
+    const [a, b] = part.split(/[-~–]/);
+    const s = parseClock(a), e = parseClock(b);
+    if (s != null && e != null && e > s) out.push({ s, e });
+  });
+  return out;
+}
+
+/* ---------------- core: availability ---------------- */
+function buildModel() {
+  const st = state.settings;
+  const D = Math.max(10, +st.duration || 90), step = Math.max(5, +st.step || 30), defTravel = Math.max(0, +st.travel || 0);
+  const windows = DAYS.map((_, d) => parseHours(state.hours[d]));
+  const students = state.students.filter(s => (s.school || '').trim()).map(s => {
+    const p = parseSchedule(s.text);
+    return { ...s, school: s.school.trim(), name: (s.name || '').trim() || '(이름 없음)', blocks: p.blocks.map(b => ({ ...b, travel: b.travel == null ? defTravel : b.travel })) };
+  });
+  const schools = schoolNames().map(name => {
+    const cfg = schoolCfg(name);
+    const members = students.filter(s => s.school === name);
+    const arrive = parseClock(cfg.arrive) ?? 0, weekendArrive = parseClock(cfg.weekendArrive) ?? 0;
+    const sessions = Math.max(1, +cfg.sessions || +st.sessions || 1);
+    const candidates = [];
+    windows.forEach((ws, day) => ws.forEach(w => {
+      for (let t = w.s; t + D <= w.e; t += step) {
+        const avail = [], missing = [];
+        members.forEach(m => {
+          const r = conflictReason(m, day, t, t + D, day < 5 ? arrive : weekendArrive);
+          if (r) missing.push({ st: m, reason: r }); else avail.push(m);
+        });
+        candidates.push({ day, s: t, e: t + D, key: day + '-' + t, avail, missing });
+      }
+    }));
+    return { name, members, sessions, candidates };
+  });
+  return { D, step, windows, students, schools };
+}
+function conflictReason(stu, day, s, e, arrive) {
+  if (s < arrive) return `하교 후 ${fmt(arrive)}부터 가능`;
+  for (const b of stu.blocks) {
+    if (b.day !== day) continue;
+    // need travel time between the other academy and ours, on both sides
+    if (s < b.e + b.travel && b.s < e + b.travel) {
+      return `${b.label} ${fmt(b.s)}~${fmt(b.e)}` + (b.travel ? ` (이동 ${b.travel}분)` : '');
+    }
+  }
+  return null;
+}
+
+/* ---------------- core: planning ---------------- */
+function plan(model) {
+  const rooms = Math.max(1, +state.settings.rooms || 1);
+  const occ = DAYS.map(() => []); // {s, e}
+  const fits = c => occ[c.day].filter(o => o.s < c.e && c.s < o.e).length < rooms;
+  const take = c => occ[c.day].push({ s: c.s, e: c.e });
+  const overlapsChosen = (c, chosen) => chosen.some(x => x.day === c.day && x.s < c.e && c.s < x.e);
+
+  // most constrained schools first: fewest slots where the best attendance is reached
+  const order = model.schools.filter(sc => sc.members.length).map(sc => {
+    const best = Math.max(0, ...sc.candidates.map(c => c.avail.length));
+    const nBest = sc.candidates.filter(c => c.avail.length === best).length;
+    return { sc, ratio: best / sc.members.length, nBest };
+  }).sort((a, b) => a.ratio - b.ratio || a.nBest - b.nBest).map(x => x.sc);
+
+  const results = [];
+  for (const sc of order) {
+    const chosen = [];
+    const byKey = Object.fromEntries(sc.candidates.map(c => [c.key, c]));
+    (state.pins[sc.name] || []).forEach(k => {
+      const c = byKey[k];
+      if (c && chosen.length < sc.sessions && !overlapsChosen(c, chosen)) { chosen.push({ ...c, pinned: true, roomOk: fits(c) }); take(c); }
+    });
+    while (chosen.length < sc.sessions) {
+      let best = null, bestScore = -Infinity;
+      for (const c of sc.candidates) {
+        if (!c.avail.length || !fits(c) || overlapsChosen(c, chosen)) continue;
+        const sameDay = chosen.filter(x => x.day === c.day).length;
+        const gap = chosen.length ? Math.min(...chosen.map(x => Math.abs(x.day - c.day))) : 0;
+        // attendance first; then spread over different days; then earlier start
+        const score = c.avail.length * 1000 - sameDay * 600 + Math.min(gap, 3) * 20 - c.s / 100;
+        if (score > bestScore) { bestScore = score; best = c; }
+      }
+      if (!best) break;
+      chosen.push({ ...best, roomOk: true });
+      take(best);
+    }
+    chosen.sort((a, b) => a.day - b.day || a.s - b.s);
+
+    // who misses how many sessions
+    const attended = new Map(sc.members.map(m => [m.id, 0]));
+    chosen.forEach(c => c.avail.forEach(m => attended.set(m.id, attended.get(m.id) + 1)));
+    const need = new Set(sc.members.filter(m => attended.get(m.id) < chosen.length || !chosen.length).map(m => m.id));
+    const neverFree = sc.members.filter(m => !sc.candidates.some(c => c.avail.includes(m)));
+    neverFree.forEach(m => need.delete(m.id));
+
+    // makeup suggestions: greedy cover of students who miss a session
+    const makeups = [];
+    const remaining = new Set(need);
+    while (remaining.size && makeups.length < 4) {
+      let best = null, bestCov = 0;
+      for (const c of sc.candidates) {
+        if (chosen.some(x => x.key === c.key) || makeups.some(x => x.key === c.key) || !fits(c)) continue;
+        const cov = c.avail.filter(m => remaining.has(m.id)).length;
+        if (cov > bestCov || (cov === bestCov && cov > 0 && best && c.avail.length > best.avail.length)) { bestCov = cov; best = c; }
+      }
+      if (!best) break;
+      const covered = best.avail.filter(m => remaining.has(m.id));
+      covered.forEach(m => remaining.delete(m.id));
+      makeups.push({ ...best, covered });
+      take(best);
+    }
+
+    const alternatives = sc.candidates
+      .filter(c => c.avail.length && !chosen.some(x => x.key === c.key))
+      .sort((a, b) => b.avail.length - a.avail.length || a.day - b.day || a.s - b.s)
+      .slice(0, 10)
+      .map(c => ({ ...c, roomOk: fits(c) }));
+
+    results.push({ sc, chosen, makeups, alternatives, attended, neverFree, uncoveredAfterMakeup: [...remaining] });
+  }
+  return results.sort((a, b) => naturalCompare(a.sc.name, b.sc.name));
+}
+
+/* ---------------- tabs ---------------- */
+document.querySelectorAll('.tab-btn').forEach(btn => btn.addEventListener('click', () => showTab(btn.dataset.tab)));
+function showTab(name) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'tab-' + name));
+  if (name === 'settings') renderSettings();
+  if (name === 'students') renderStudents();
+  if (name === 'result') renderResult();
+  if (name === 'heat') renderHeat();
+}
+
+/* ---------------- settings tab ---------------- */
+const settingInputs = { setDuration: 'duration', setStep: 'step', setTravel: 'travel', setSessions: 'sessions', setRooms: 'rooms' };
+Object.entries(settingInputs).forEach(([id, key]) => {
+  document.getElementById(id).addEventListener('input', e => { state.settings[key] = e.target.value; save(); });
+});
+function renderSettings() {
+  Object.entries(settingInputs).forEach(([id, key]) => { document.getElementById(id).value = state.settings[key]; });
+  document.getElementById('hoursTable').innerHTML =
+    '<tr><th style="width:60px">요일</th><th>수업 가능 시간</th><th style="width:150px"></th></tr>' +
+    DAYS.map((d, i) => `<tr><td><b>${d}</b></td><td><input type="text" data-hour="${i}" value="${esc(state.hours[i])}" placeholder="수업 없음"></td><td class="reason" id="hourOk${i}"></td></tr>`).join('');
+  document.querySelectorAll('[data-hour]').forEach(inp => {
+    const i = +inp.dataset.hour;
+    const check = () => {
+      const ws = parseHours(inp.value);
+      document.getElementById('hourOk' + i).textContent = inp.value.trim() && !ws.length ? '형식 확인: 15:00-22:00' : ws.map(w => fmt(w.s) + '~' + fmt(w.e)).join(', ');
+    };
+    inp.addEventListener('input', () => { state.hours[i] = inp.value; save(); check(); });
+    check();
+  });
+  renderSchoolTable();
+}
+function renderSchoolTable() {
+  const names = schoolNames();
+  const wrap = document.getElementById('schoolTableWrap');
+  if (!names.length) { wrap.innerHTML = '<p class="empty-note">학생을 먼저 입력하면 학교가 여기에 나타나요.</p>'; return; }
+  wrap.innerHTML = `<table class="simple"><tr><th>학교</th><th>학생 수</th><th>평일 도착 가능</th><th>주말 도착 가능</th><th>주당 횟수</th></tr>` +
+    names.map(n => {
+      const c = schoolCfg(n), cnt = state.students.filter(s => (s.school || '').trim() === n).length;
+      return `<tr><td><span class="dot" style="background:${schoolColor(n)}"></span>${esc(n)}</td><td>${cnt}명</td>
+        <td><input type="time" data-school="${esc(n)}" data-k="arrive" value="${esc(c.arrive)}"></td>
+        <td><input type="time" data-school="${esc(n)}" data-k="weekendArrive" value="${esc(c.weekendArrive)}"></td>
+        <td><input type="number" min="1" max="7" style="width:70px" data-school="${esc(n)}" data-k="sessions" value="${esc(c.sessions)}" placeholder="${esc(state.settings.sessions)}"></td></tr>`;
+    }).join('') + '</table>';
+  wrap.querySelectorAll('[data-school]').forEach(inp => inp.addEventListener('input', () => {
+    schoolCfg(inp.dataset.school)[inp.dataset.k] = inp.value; save();
+  }));
+}
+
+/* ---------------- students tab ---------------- */
+let filterTerm = '';
+document.getElementById('filterSchool').addEventListener('input', e => { filterTerm = e.target.value.trim(); renderStudents(); });
+document.getElementById('btnAddStudent').addEventListener('click', () => {
+  const lastSchool = state.students.length ? state.students[state.students.length - 1].school : '';
+  state.students.push({ id: genId(), name: '', school: lastSchool, text: '' });
+  save(); filterTerm = ''; document.getElementById('filterSchool').value = '';
+  renderStudents();
+  const inputs = document.querySelectorAll('#studentList input.name');
+  inputs[inputs.length - 1]?.focus();
+});
+function updateCount() { document.getElementById('stuCount').textContent = state.students.length; }
+function renderStudents() {
+  updateCount();
+  document.getElementById('schoolOptions').innerHTML = schoolNames().map(n => `<option value="${esc(n)}">`).join('');
+  const list = document.getElementById('studentList');
+  const shown = state.students.filter(s => !filterTerm || (s.name || '').includes(filterTerm) || (s.school || '').includes(filterTerm));
+  if (!shown.length) { list.innerHTML = `<p class="empty-note">${state.students.length ? '검색 결과가 없어요.' : '아직 학생이 없어요. "+ 학생 추가"를 누르거나 아래에 한꺼번에 붙여넣어 보세요.'}</p>`; return; }
+  const sorted = [...shown].sort((a, b) => naturalCompare(a.school || '', b.school || ''));
+  list.innerHTML = sorted.map(s => `
+    <div class="student" data-id="${s.id}">
+      <div class="head">
+        <span class="dot" style="background:${schoolColor((s.school || '').trim())}"></span>
+        <input type="text" class="name" placeholder="이름" value="${esc(s.name)}">
+        <input type="text" class="school" placeholder="학교" list="schoolOptions" value="${esc(s.school)}">
+        <span class="spacer"></span>
+        <button class="btn small danger del">삭제</button>
+      </div>
+      <textarea rows="${Math.max(2, (s.text || '').split('\n').length)}" placeholder="월수금 17:00-19:00 수학학원 이동15">${esc(s.text)}</textarea>
+      <div class="chips"></div>
+    </div>`).join('');
+  list.querySelectorAll('.student').forEach(card => {
+    const s = state.students.find(x => x.id === card.dataset.id);
+    const preview = () => {
+      const p = parseSchedule(s.text), travel = +state.settings.travel || 0;
+      card.querySelector('.chips').innerHTML =
+        (!(s.school || '').trim() ? '<span class="chip err">학교를 입력해주세요</span>' : '') +
+        (p.blocks.length || p.errors.length ? '' : '<span class="chip muted">타학원 일정 없음 (언제든 가능)</span>') +
+        p.blocks.map(b => `<span class="chip">${DAYS[b.day]} ${fmt(b.s)}~${fmt(b.e)} ${esc(b.label)} · 이동${b.travel ?? travel}분</span>`).join('') +
+        p.errors.map(e => `<span class="chip err">${esc(e)}</span>`).join('');
+    };
+    preview();
+    card.querySelector('.name').addEventListener('input', e => { s.name = e.target.value; save(); });
+    card.querySelector('.school').addEventListener('input', e => { s.school = e.target.value; save(); preview(); });
+    card.querySelector('.school').addEventListener('change', () => renderStudents());
+    card.querySelector('textarea').addEventListener('input', e => { s.text = e.target.value; save(); preview(); });
+    card.querySelector('.del').addEventListener('click', () => {
+      if (!confirm(`${s.name || '이 학생'}을(를) 삭제할까요?`)) return;
+      state.students = state.students.filter(x => x.id !== s.id); save(); renderStudents();
+    });
+  });
+}
+document.getElementById('btnBulk').addEventListener('click', () => {
+  const lines = document.getElementById('bulkText').value.split('\n');
+  const added = [];
+  let cur = null;
+  lines.forEach(line => {
+    const t = line.trim();
+    if (!t) return;
+    const head = /^(.+?)\s*[/|]\s*(.+)$/.exec(t);
+    if (head && !RANGE_RE.test(t)) {
+      cur = { id: genId(), name: head[1].trim(), school: head[2].trim(), text: '' };
+      added.push(cur);
+    } else if (cur) {
+      cur.text += (cur.text ? '\n' : '') + t;
+    }
+  });
+  const msg = document.getElementById('bulkMsg');
+  if (!added.length) { msg.textContent = '첫 줄을 "이름 / 학교" 형식으로 적어주세요.'; return; }
+  state.students.push(...added); save();
+  document.getElementById('bulkText').value = '';
+  msg.textContent = `${added.length}명 추가했어요.`;
+  renderStudents();
+});
+
+/* ---------------- result tab ---------------- */
+document.getElementById('btnReplan').addEventListener('click', () => { state.pins = {}; save(); renderResult(); });
+function attendBadge(n, total) {
+  const cls = n === total ? 'ok' : n / total >= 0.7 ? 'warn' : 'bad';
+  return `<span class="badge ${cls}">${n}/${total}명</span>`;
+}
+function renderResult() {
+  const wrap = document.getElementById('resultWrap');
+  const model = buildModel();
+  if (!model.students.length) { wrap.innerHTML = '<div class="card"><p class="empty-note">학생 탭에서 학생과 타학원 시간표를 먼저 입력해주세요.</p></div>'; return; }
+  if (!model.windows.some(w => w.length)) { wrap.innerHTML = '<div class="card"><p class="empty-note">기본 설정에서 우리 학원 수업 가능 시간을 입력해주세요.</p></div>'; return; }
+  const results = plan(model);
+  let html = '';
+
+  const fullCount = results.filter(r => r.chosen.length && r.chosen.every(c => c.avail.length === r.sc.members.length)).length;
+  html += `<div class="notice">총 ${results.length}개 학교 · ${model.students.length}명 · 수업 ${model.D}분 기준. ` +
+    `<b>${fullCount}개 학교</b>는 모든 회차에 전원 참석 가능한 시간을 찾았어요.` +
+    (fullCount < results.length ? ' 나머지는 참석 인원이 가장 많은 시간 + 빠지는 학생용 보강 시간을 제안했어요.' : '') + '</div>';
+
+  html += `<div class="card"><h2>주간 시간표</h2><div class="legend">` +
+    results.map(r => `<span><span class="dot" style="background:${schoolColor(r.sc.name)}"></span>${esc(r.sc.name)}</span>`).join('') +
+    `<span><span class="dot" style="border:2px dashed #888;background:#fff"></span>보강(제안)</span></div><div class="week-wrap">${renderWeek(model, results)}</div></div>`;
+
+  results.forEach(r => {
+    const total = r.sc.members.length, color = schoolColor(r.sc.name);
+    html += `<div class="card school-card" style="border-left-color:${color}"><h2>${esc(r.sc.name)} <span class="reason">${total}명 · 주 ${r.sc.sessions}회</span></h2>`;
+    if (!r.chosen.length) html += '<p class="miss" style="font-size:13.5px">수업 가능한 시간이 없어요. 학원 수업 가능 시간이나 하교 시각, 동시 수업 수를 확인해주세요.</p>';
+    if (r.chosen.length < r.sc.sessions && r.chosen.length) html += `<p class="miss" style="font-size:13px;margin-bottom:0.4rem">요청한 ${r.sc.sessions}회 중 ${r.chosen.length}회만 배정했어요 (가능한 시간이 부족해요).</p>`;
+    r.chosen.forEach((c, i) => {
+      html += `<div class="session"><div class="when">${i + 1}회차 · ${fmtRange(c.day, c.s, c.e)}<br>${attendBadge(c.avail.length, total)}${c.pinned ? '<span class="badge">직접 고정</span>' : ''}${c.roomOk ? '' : '<span class="badge bad">다른 학교와 겹침</span>'}</div>
+        <div class="who">참석: ${c.avail.map(m => esc(m.name)).join(', ') || '-'}` +
+        (c.missing.length ? `<br>${c.missing.map(x => `<span class="miss">✕ ${esc(x.st.name)}</span> <span class="reason">${esc(x.reason)}</span>`).join('<br>')}` : '') + `</div></div>`;
+    });
+    if (r.makeups.length) {
+      html += `<h3>보강 제안 (빠지는 학생용)</h3>` + r.makeups.map(m =>
+        `<div class="alt"><span class="when">${fmtRange(m.day, m.s, m.e)}</span><span>${m.covered.map(x => esc(x.name)).join(', ')}</span><span class="reason">· 이 시간엔 총 ${m.avail.length}명 가능</span></div>`).join('');
+    }
+    if (r.uncoveredAfterMakeup.length) {
+      const names = r.sc.members.filter(m => r.uncoveredAfterMakeup.includes(m.id)).map(m => esc(m.name));
+      html += `<p class="reason" style="margin-top:0.4rem">보강 시간까지 잡기 어려운 학생: ${names.join(', ')} (동시 수업 수가 부족할 수 있어요)</p>`;
+    }
+    if (r.neverFree.length) {
+      html += `<p class="miss" style="font-size:13px;margin-top:0.5rem">⚠ 학원 수업 가능 시간 안에 비는 시간이 전혀 없는 학생: ${r.neverFree.map(m => esc(m.name)).join(', ')} — 개별 일정 조율이 필요해요.</p>`;
+    }
+    if (r.alternatives.length) {
+      html += `<details class="no-print"><summary>대안 시간 보기 (참석 인원 많은 순)</summary><div class="alt-list">` + r.alternatives.map(a =>
+        `<div class="alt"><span class="when">${fmtRange(a.day, a.s, a.e)}</span>${attendBadge(a.avail.length, total)}${a.roomOk ? '' : '<span class="badge bad">다른 수업과 겹침</span>'}
+          <span class="reason">${a.missing.length ? '못 옴: ' + a.missing.map(x => esc(x.st.name)).join(', ') : '전원 가능'}</span>
+          ${r.chosen.map((c, i) => `<button class="btn small" data-swap="${esc(r.sc.name)}" data-idx="${i}" data-key="${a.key}">${i + 1}회차와 교체</button>`).join('')}
+          ${r.chosen.length < r.sc.sessions ? `<button class="btn small" data-swap="${esc(r.sc.name)}" data-idx="${r.chosen.length}" data-key="${a.key}">회차로 추가</button>` : ''}
+        </div>`).join('') + `</div></details>`;
+    }
+    html += '</div>';
+  });
+  wrap.innerHTML = html;
+  wrap.querySelectorAll('[data-swap]').forEach(btn => btn.addEventListener('click', () => {
+    const r = results.find(x => x.sc.name === btn.dataset.swap);
+    const keys = r.chosen.map(c => c.key);
+    keys[+btn.dataset.idx] = btn.dataset.key;
+    state.pins[r.sc.name] = keys; save(); renderResult();
+  }));
+}
+function renderWeek(model, results) {
+  const all = model.windows.flat();
+  const items = results.flatMap(r => [
+    ...r.chosen.map((c, i) => ({ ...c, school: r.sc.name, title: `${r.sc.name} ${i + 1}회`, sub: `${c.avail.length}/${r.sc.members.length}명` })),
+    ...r.makeups.map(m => ({ ...m, school: r.sc.name, makeup: true, title: `${r.sc.name} 보강`, sub: m.covered.map(x => x.name).join(', ') })),
+  ]);
+  const lo = Math.floor(Math.min(...all.map(w => w.s), ...items.map(i => i.s)) / 60) * 60;
+  const hi = Math.ceil(Math.max(...all.map(w => w.e), ...items.map(i => i.e)) / 60) * 60;
+  const PX = 1.1, H = (hi - lo) * PX;
+  let html = '<div class="week"><div></div>' + DAYS.map(d => `<div class="dayhead">${d}</div>`).join('');
+  html += `<div class="col" style="height:${H}px;border-left:none">` +
+    Array.from({ length: (hi - lo) / 60 + 1 }, (_, k) => `<span class="tlabel" style="top:${k * 60 * PX}px">${fmt(lo + k * 60)}</span>`).join('') + '</div>';
+  DAYS.forEach((_, d) => {
+    // lay out overlapping items side by side
+    const dayItems = items.filter(i => i.day === d).sort((a, b) => a.s - b.s);
+    const lanes = [];
+    dayItems.forEach(it => {
+      let lane = lanes.findIndex(end => end <= it.s);
+      if (lane < 0) { lane = lanes.length; lanes.push(0); }
+      lanes[lane] = it.e; it.lane = lane;
+    });
+    const n = Math.max(1, lanes.length);
+    html += `<div class="col closed" style="height:${H}px">` +
+      model.windows[d].map(w => `<div class="open" style="top:${(w.s - lo) * PX}px;height:${(w.e - w.s) * PX}px"></div>`).join('') +
+      Array.from({ length: (hi - lo) / 60 }, (_, k) => `<div class="tick" style="top:${k * 60 * PX}px"></div>`).join('') +
+      dayItems.map(it => {
+        const color = schoolColor(it.school);
+        return `<div class="ev ${it.makeup ? 'makeup' : ''}" style="top:${(it.s - lo) * PX}px;height:${(it.e - it.s) * PX - 2}px;background:${color};border-color:${color};left:calc(${it.lane / n * 100}% + 3px);right:auto;width:calc(${100 / n}% - 6px)" title="${esc(it.title + ' ' + fmt(it.s) + '~' + fmt(it.e) + ' · ' + it.sub)}"><b>${esc(it.title)}</b>${fmt(it.s)}~${fmt(it.e)}<br>${esc(it.sub)}</div>`;
+      }).join('') + '</div>';
+  });
+  return html + '</div>';
+}
+
+/* ---------------- heatmap tab ---------------- */
+let heatSel = null;
+document.getElementById('heatSchool').addEventListener('change', () => { heatSel = null; renderHeat(); });
+function renderHeat() {
+  const sel = document.getElementById('heatSchool');
+  const names = schoolNames(), prev = sel.value;
+  sel.innerHTML = names.map(n => `<option>${esc(n)}</option>`).join('');
+  if (names.includes(prev)) sel.value = prev;
+  const wrap = document.getElementById('heatWrap'), detail = document.getElementById('heatDetail');
+  if (!names.length) { wrap.innerHTML = '<p class="empty-note">학생을 먼저 입력해주세요.</p>'; detail.innerHTML = ''; return; }
+  const model = buildModel();
+  const sc = model.schools.find(s => s.name === sel.value);
+  const total = sc.members.length;
+  const byKey = Object.fromEntries(sc.candidates.map(c => [c.key, c]));
+  const starts = [...new Set(sc.candidates.map(c => c.s))].sort((a, b) => a - b);
+  if (!starts.length) { wrap.innerHTML = '<p class="empty-note">학원 수업 가능 시간이 없어요.</p>'; detail.innerHTML = ''; return; }
+  const color = schoolColor(sc.name);
+  let html = `<table class="heat"><tr><th>시작</th>${DAYS.map(d => `<th>${d}</th>`).join('')}</tr>`;
+  starts.forEach(t => {
+    html += `<tr><th>${fmt(t)}</th>` + DAYS.map((_, d) => {
+      const c = byKey[d + '-' + t];
+      if (!c) return '<td class="closed">·</td>';
+      const ratio = total ? c.avail.length / total : 0;
+      const bg = ratio === 1 ? color : `color-mix(in srgb, ${color} ${Math.round(ratio * 70)}%, #fff)`;
+      return `<td data-key="${c.key}" class="${heatSel === c.key ? 'sel' : ''}" style="background:${bg};color:${ratio > 0.6 ? '#fff' : '#333'}">${c.avail.length}${ratio === 1 ? ' ★' : ''}</td>`;
+    }).join('') + '</tr>';
+  });
+  wrap.innerHTML = html + '</table><p class="reason" style="margin-top:0.4rem">★ = 전원 가능 · 진할수록 많이 올 수 있어요</p>';
+  wrap.querySelectorAll('td[data-key]').forEach(td => td.addEventListener('click', () => { heatSel = td.dataset.key; renderHeat(); }));
+  const c = heatSel && byKey[heatSel];
+  detail.innerHTML = c ? `<h3>${fmtRange(c.day, c.s, c.e)} ${attendBadge(c.avail.length, total)}</h3>
+    <p style="font-size:13.5px;line-height:1.8">가능: ${c.avail.map(m => esc(m.name)).join(', ') || '-'}<br>` +
+    c.missing.map(x => `<span class="miss">✕ ${esc(x.st.name)}</span> <span class="reason">${esc(x.reason)}</span>`).join('<br>') + '</p>' : '';
+}
+
+/* ---------------- data buttons ---------------- */
+document.getElementById('btnExport').addEventListener('click', () => {
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `시험대비시간표_${new Date().toISOString().slice(0, 10)}.json`;
+  a.click(); URL.revokeObjectURL(a.href);
+});
+document.getElementById('btnImport').addEventListener('click', () => document.getElementById('importFile').click());
+document.getElementById('importFile').addEventListener('change', e => {
+  const f = e.target.files[0]; if (!f) return;
+  f.text().then(t => {
+    try { state = Object.assign(defaultState(), JSON.parse(t)); save(); showTab('settings'); updateCount(); alert('불러왔어요.'); }
+    catch (err) { alert('파일 형식이 올바르지 않아요.'); }
+  });
+  e.target.value = '';
+});
+document.getElementById('btnReset').addEventListener('click', () => {
+  if (!confirm('입력한 학생과 설정을 모두 지울까요?')) return;
+  state = defaultState(); save(); showTab('settings'); updateCount();
+});
+document.getElementById('btnSample').addEventListener('click', () => {
+  if (state.students.length && !confirm('지금 입력한 내용을 예시 데이터로 바꿀까요?')) return;
+  const S = (name, school, text) => ({ id: genId(), name, school, text });
+  state = defaultState();
+  state.schoolCfg = {
+    '대치중': { arrive: '16:20', weekendArrive: '09:00', sessions: '' },
+    '단대부중': { arrive: '16:40', weekendArrive: '09:00', sessions: '' },
+    '휘문중': { arrive: '16:10', weekendArrive: '09:00', sessions: '3' },
+  };
+  state.students = [
+    S('김민수', '대치중', '월수 17:00-19:00 수학학원 이동15\n화목 18:00-20:00 영어학원'),
+    S('박지훈', '대치중', '월수금 19:00-21:30 수학학원 이동10\n토 10:00-16:00 과학 이동20'),
+    S('최유나', '대치중', '화목 16:30-18:30 영어 이동20\n금 17:00-19:00 피아노 이동5'),
+    S('정하은', '대치중', '평일 20:00-22:00 독서실 이동0'),
+    S('이서연', '단대부중', '월수 17:00-19:30 수학학원 이동15\n토 13:00-16:00 영어'),
+    S('한도윤', '단대부중', '화목 17:30-21:00 수학학원\n금 18:00-20:00 과학 이동25\n토 09:30-12:30 수학 클리닉'),
+    S('윤채원', '단대부중', '월 18:00-20:00 바이올린 이동10\n수금 19:00-21:00 영어'),
+    S('강시우', '휘문중', '월수금 18:00-20:00 수학학원 이동10'),
+    S('조예준', '휘문중', '화목 17:00-19:00 영어학원 이동15\n토 10-12 수영 이동20'),
+    S('신하린', '휘문중', '월화 19:30-21:30 과학 이동15\n목 17:00-18:30 미술'),
+    S('오지호', '휘문중', '평일 17:00-18:00 태권도 이동5\n수 19:00-21:00 수학'),
+  ];
+  save(); updateCount(); showTab('result');
+});
+
+/* ---------------- init ---------------- */
+updateCount();
+renderSettings();
+</script>
+</body>
+</html>
