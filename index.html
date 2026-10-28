@@ -4,128 +4,187 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>시험대비 학교별 시간표 메이커</title>
-<meta name="theme-color" content="#185FA5">
+<meta name="theme-color" content="#E6EAE8">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="시험대비 시간표">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=Nanum+Pen+Script&display=swap">
 <style>
+/* Whiteboard + magnets: the way academies already plan timetables */
+:root {
+  --page: #E6EAE8;
+  --board: #FCFDFC;
+  --frame: #C3CACD;
+  --frame-dark: #9AA3A7;
+  --rule: #E3E8E6;
+  --ink: #1E2A33;
+  --ink-soft: #54616B;
+  --ink-faint: #8A959C;
+  --blue: #1F4FB8;
+  --blue-wash: #E8EEFA;
+  --red: #CC3227;
+  --red-wash: #FBEAE8;
+  --green: #1B8653;
+  --green-wash: #E5F4EC;
+  --amber: #9A6A00;
+  --amber-wash: #FBF2DC;
+  --hand: 'Nanum Pen Script', 'IBM Plex Sans KR', cursive;
+  --sans: 'IBM Plex Sans KR', -apple-system, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+}
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; background: #f5f5f3; min-height: 100vh; display: flex; justify-content: center; padding: 2rem 1rem; color: #2c2c2a; }
-.app { max-width: 980px; width: 100%; }
-h1 { font-size: 21px; font-weight: 600; color: #1a1a18; margin-bottom: 0.25rem; }
-.subtitle { font-size: 14px; color: #888; margin-bottom: 1.5rem; line-height: 1.6; }
+body { font-family: var(--sans); font-size: 14.5px; line-height: 1.6; background: var(--page); color: var(--ink); min-height: 100vh; padding: 28px 16px 48px; -webkit-font-smoothing: antialiased; }
+.app { max-width: 1000px; margin: 0 auto; }
+:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
 
-.tabs { display: flex; gap: 6px; margin-bottom: 1.25rem; border-bottom: 1px solid #e8e8e6; overflow-x: auto; }
-.tab-btn { background: transparent; border: none; padding: 0.65rem 0.9rem; font-size: 14px; font-weight: 500; color: #888; cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap; }
-.tab-btn:hover { color: #185FA5; }
-.tab-btn.active { color: #185FA5; border-bottom-color: #185FA5; }
+/* header */
+.masthead { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; }
+h1 { font-family: var(--hand); font-weight: 400; font-size: 46px; line-height: 1; color: var(--blue); letter-spacing: -0.5px; }
+.subtitle { max-width: 34em; font-size: 14px; color: var(--ink-soft); margin-top: 8px; }
+
+/* steps: the four tabs really are a sequence */
+.tabs { display: flex; gap: 4px; overflow-x: auto; padding: 0 10px; position: relative; z-index: 1; margin-bottom: -2px; }
+.tab-btn { font: inherit; font-size: 14px; font-weight: 500; color: var(--ink-soft); background: #EEF1EF; border: 2px solid var(--frame); border-bottom: none; border-radius: 10px 10px 0 0; padding: 9px 16px 8px; cursor: pointer; white-space: nowrap; display: flex; align-items: center; gap: 8px; }
+.tab-btn:hover { color: var(--ink); background: #F5F7F6; }
+.tab-btn.active { background: var(--board); color: var(--ink); font-weight: 600; padding-bottom: 10px; }
+.tab-btn .step { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; font-size: 12px; font-weight: 700; color: #fff; background: var(--frame-dark); }
+.tab-btn.active .step { background: var(--blue); }
+
+/* the board */
+.board { background: var(--board); border: 2px solid var(--frame); border-radius: 12px; box-shadow: inset 0 0 0 6px #F1F4F2, 0 1px 0 #fff; padding: 8px 28px 28px; }
 .tab-panel { display: none; }
 .tab-panel.active { display: block; }
 
-.card { background: #fff; border: 1px solid #e8e8e6; border-radius: 14px; padding: 1.25rem 1.4rem; margin-bottom: 1.25rem; }
-.card h2 { font-size: 15px; font-weight: 600; margin-bottom: 0.75rem; color: #1a1a18; }
-.card h3 { font-size: 13px; font-weight: 600; margin: 1rem 0 0.5rem; color: #444; }
-.hint { font-size: 12.5px; color: #999; line-height: 1.6; margin-bottom: 0.75rem; }
-.hint code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; background: #f1f1ef; padding: 1px 5px; border-radius: 4px; color: #555; }
+.card { padding: 22px 0; border-bottom: 2px dashed var(--rule); }
+.card:last-child { border-bottom: none; }
+.card h2 { font-family: var(--hand); font-weight: 400; font-size: 30px; line-height: 1.1; color: var(--ink); margin-bottom: 10px; }
+.card h3 { font-size: 13.5px; font-weight: 600; margin: 16px 0 6px; color: var(--ink); }
+.hint { font-size: 13px; color: var(--ink-soft); line-height: 1.7; margin-bottom: 12px; max-width: 72ch; }
+.hint code, .mono { font-family: var(--sans); font-weight: 500; background: var(--blue-wash); color: var(--blue); padding: 1px 6px; border-radius: 4px; white-space: nowrap; }
 
-label { font-size: 13px; color: #555; }
-input[type=text], input[type=number], input[type=time], select, textarea { font: inherit; font-size: 14px; border: 1px solid #ddd; border-radius: 8px; padding: 0.45rem 0.6rem; background: #fff; color: #2c2c2a; }
-input:focus, select:focus, textarea:focus { outline: none; border-color: #185FA5; box-shadow: 0 0 0 3px rgba(24,95,165,0.12); }
-textarea { width: 100%; resize: vertical; line-height: 1.6; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; }
+label { font-size: 13px; font-weight: 500; color: var(--ink-soft); }
+input[type=text], input[type=number], input[type=time], select, textarea { font: inherit; font-size: 14px; border: 1.5px solid #D3DADC; border-radius: 6px; padding: 7px 10px; background: #fff; color: var(--ink); }
+input:focus, select:focus, textarea:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px var(--blue-wash); }
+textarea { width: 100%; resize: vertical; line-height: 1.7; font-size: 14px; }
 
-.btn { font: inherit; font-size: 13.5px; font-weight: 500; border: 1px solid #ddd; background: #fff; color: #333; border-radius: 8px; padding: 0.45rem 0.85rem; cursor: pointer; }
-.btn:hover { border-color: #185FA5; color: #185FA5; }
-.btn.primary { background: #185FA5; border-color: #185FA5; color: #fff; }
-.btn.primary:hover { background: #134d87; color: #fff; }
-.btn.danger:hover { border-color: #c0392b; color: #c0392b; }
-.btn.small { font-size: 12px; padding: 0.25rem 0.55rem; }
-.row { display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: center; }
-.row + .row { margin-top: 0.6rem; }
+.btn { font: inherit; font-size: 13.5px; font-weight: 500; border: 1.5px solid #CBD2D5; background: #fff; color: var(--ink); border-radius: 6px; padding: 7px 14px; cursor: pointer; }
+.btn:hover { border-color: var(--ink-soft); }
+.btn.primary { background: var(--blue); border-color: var(--blue); color: #fff; font-weight: 600; }
+.btn.primary:hover { background: #193f94; border-color: #193f94; }
+.btn.danger { color: var(--red); }
+.btn.danger:hover { border-color: var(--red); }
+.btn.small { font-size: 12.5px; padding: 3px 9px; }
+.row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.row + .row { margin-top: 10px; }
 
-.grid-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 0.8rem 1rem; }
-.field { display: flex; flex-direction: column; gap: 4px; }
-.field small { color: #aaa; font-size: 11.5px; }
+.grid-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 16px 20px; }
+.field { display: flex; flex-direction: column; gap: 5px; }
+.field small { color: var(--ink-faint); font-size: 12px; line-height: 1.5; }
 
-table.simple { width: 100%; border-collapse: collapse; font-size: 13.5px; }
-table.simple th, table.simple td { border-bottom: 1px solid #eee; padding: 0.45rem 0.4rem; text-align: left; vertical-align: middle; }
-table.simple th { font-size: 12px; color: #888; font-weight: 500; }
+table.simple { width: 100%; border-collapse: collapse; font-size: 14px; }
+table.simple th, table.simple td { border-bottom: 1px solid var(--rule); padding: 8px 6px; text-align: left; vertical-align: middle; }
+table.simple th { font-size: 12.5px; color: var(--ink-faint); font-weight: 500; }
 table.simple input[type=text] { width: 100%; }
 
-.student { border: 1px solid #ececea; border-radius: 12px; padding: 0.9rem 1rem; margin-bottom: 0.8rem; background: #fcfcfb; }
-.student .head { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.55rem; flex-wrap: wrap; }
-.student .head input.name { width: 120px; }
+.student { border: 1.5px solid var(--rule); border-radius: 8px; padding: 14px 16px; margin-bottom: 12px; background: #fff; }
+.student .head { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
+.student .head input.name { width: 120px; font-weight: 600; }
 .student .head input.school { width: 150px; }
 .student .head .spacer { flex: 1; }
-.chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 0.5rem; }
-.chip { font-size: 12px; padding: 2px 8px; border-radius: 999px; background: #eef3fa; color: #185FA5; }
-.chip.err { background: #fdecea; color: #c0392b; }
-.chip.muted { background: #f1f1ef; color: #888; }
-.dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.chip { font-size: 12.5px; padding: 2px 9px; border-radius: 4px; background: var(--blue-wash); color: var(--blue); }
+.chip.err { background: var(--red-wash); color: var(--red); }
+.chip.muted { background: #F0F2F1; color: var(--ink-soft); }
+/* round magnet used as the school marker everywhere */
+.dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; box-shadow: inset 0 -2px 0 rgba(0,0,0,0.22), inset 0 2px 0 rgba(255,255,255,0.35); }
 
-.empty-note { font-size: 13.5px; color: #999; padding: 1rem 0; text-align: center; }
-.badge { display: inline-block; font-size: 11.5px; font-weight: 600; padding: 1px 7px; border-radius: 999px; background: #eef3fa; color: #185FA5; margin-left: 4px; }
-.badge.ok { background: #e7f6ec; color: #1e8449; }
-.badge.warn { background: #fff4e0; color: #b9770e; }
-.badge.bad { background: #fdecea; color: #c0392b; }
+.empty-note { font-size: 14px; color: var(--ink-soft); padding: 28px 0; text-align: center; }
+.badge { display: inline-block; font-size: 12px; font-weight: 600; padding: 0 7px; border-radius: 4px; background: var(--blue-wash); color: var(--blue); margin-left: 4px; }
+.badge.ok { background: var(--green-wash); color: var(--green); }
+.badge.warn { background: var(--amber-wash); color: var(--amber); }
+.badge.bad { background: var(--red-wash); color: var(--red); }
+.tab-btn .badge { margin-left: 0; }
 
 /* result */
-.school-card { border-left: 5px solid #ccc; }
-.session { display: flex; gap: 0.8rem; align-items: flex-start; padding: 0.6rem 0; border-bottom: 1px dashed #eee; flex-wrap: wrap; }
-.session:last-child { border-bottom: none; }
-.session .when { font-weight: 600; min-width: 150px; }
-.session .who { flex: 1; font-size: 13px; line-height: 1.7; min-width: 220px; }
-.miss { color: #c0392b; }
-.reason { color: #999; font-size: 12px; }
-details { margin-top: 0.6rem; }
-details summary { cursor: pointer; font-size: 13px; color: #185FA5; }
-.alt-list { margin-top: 0.4rem; }
-.alt { display: flex; gap: 0.6rem; align-items: center; font-size: 13px; padding: 0.3rem 0; flex-wrap: wrap; }
-.alt .when { min-width: 140px; font-weight: 500; }
+.school-card h2 { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.school-card h2 .dot { width: 20px; height: 20px; margin: 0; }
+.school-card h2 .reason { font-family: var(--sans); font-size: 13px; }
+.session { display: flex; gap: 16px; align-items: flex-start; padding: 12px 0; border-bottom: 1px solid var(--rule); flex-wrap: wrap; }
+.session:last-of-type { border-bottom: none; }
+.session .when { font-weight: 600; min-width: 170px; font-variant-numeric: tabular-nums; }
+.session .who { flex: 1; font-size: 13.5px; line-height: 1.8; min-width: 220px; }
+.miss { color: var(--red); font-weight: 500; }
+.reason { color: var(--ink-faint); font-size: 12.5px; }
+details { margin-top: 10px; }
+details summary { cursor: pointer; font-size: 13.5px; font-weight: 500; color: var(--blue); padding: 4px 0; }
+.alt-list { margin-top: 6px; }
+.alt { display: flex; gap: 10px; align-items: center; font-size: 13.5px; padding: 6px 0; flex-wrap: wrap; border-bottom: 1px solid #F0F3F1; }
+.alt .when { min-width: 160px; font-weight: 500; font-variant-numeric: tabular-nums; }
 
-/* weekly grid */
-.week-wrap { overflow-x: auto; padding-bottom: 10px; }
-.week { display: grid; grid-template-columns: 52px repeat(7, minmax(92px, 1fr)); min-width: 720px; }
-.week .dayhead { text-align: center; font-size: 13px; font-weight: 600; padding: 0.4rem 0; border-bottom: 1px solid #e8e8e6; }
-.week .col { position: relative; border-left: 1px solid #f0f0ee; }
-.week .col.closed { background: repeating-linear-gradient(45deg, #fafaf9, #fafaf9 6px, #f3f3f1 6px, #f3f3f1 12px); }
+/* weekly grid: the whiteboard with magnets */
+.week-wrap { overflow-x: auto; padding-bottom: 12px; }
+.week { display: grid; grid-template-columns: 52px repeat(7, minmax(96px, 1fr)); min-width: 740px; background: #fff; }
+.week .dayhead { text-align: center; font-family: var(--hand); font-size: 26px; line-height: 1; padding: 6px 0 8px; color: var(--ink); border-bottom: 2px solid var(--ink); }
+.week .dayhead:nth-child(7) { color: var(--blue); }
+.week .dayhead:nth-child(8) { color: var(--red); }
+.week .col { position: relative; border-left: 1px solid var(--rule); }
+.week .col.closed { background: repeating-linear-gradient(-45deg, #F6F8F7 0 5px, #EDF1EF 5px 6px); }
 .week .open { position: absolute; left: 0; right: 0; background: #fff; }
-.week .tick { position: absolute; left: 0; right: 0; border-top: 1px solid #f0f0ee; }
-.week .tlabel { position: absolute; right: 6px; font-size: 11px; color: #aaa; transform: translateY(-50%); }
-.week .ev { position: absolute; left: 3px; right: 3px; border-radius: 6px; padding: 3px 5px; font-size: 11.5px; line-height: 1.35; color: #fff; overflow: hidden; box-shadow: 0 1px 2px rgba(0,0,0,0.08); }
-.week .ev.makeup { background: #fff !important; border: 2px dashed; color: #333; }
-.week .ev b { display: block; font-size: 12px; }
+.week .tick { position: absolute; left: 0; right: 0; border-top: 1px solid var(--rule); }
+.week .tlabel { position: absolute; right: 8px; font-size: 11.5px; color: var(--ink-faint); transform: translateY(-50%); font-variant-numeric: tabular-nums; }
+.week .ev { position: absolute; left: 3px; right: 3px; border-radius: 5px; padding: 4px 6px; font-size: 11.5px; line-height: 1.35; color: #fff; overflow: hidden; box-shadow: inset 0 -3px 0 rgba(0,0,0,0.2), 0 2px 3px rgba(30,42,51,0.18); animation: snap 0.32s cubic-bezier(0.3, 1.5, 0.55, 1) both; animation-delay: calc(var(--i, 0) * 45ms); }
+.week .ev b { display: block; font-size: 12.5px; font-weight: 700; }
+.week .ev.makeup { background: rgba(255,255,255,0.85) !important; border: 2px dashed; color: var(--ink); box-shadow: none; }
+.week .ev.makeup b { font-family: var(--hand); font-size: 19px; font-weight: 400; line-height: 1; }
+@keyframes snap { from { transform: translateY(-10px) scale(1.04); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .week .ev { animation: none; } }
 
 /* heatmap */
-.heat { border-collapse: collapse; font-size: 12px; margin-top: 0.5rem; }
-.heat th { font-weight: 500; color: #888; padding: 3px 6px; }
-.heat td { width: 70px; height: 24px; text-align: center; border: 2px solid #fff; border-radius: 4px; cursor: pointer; color: #333; }
-.heat td.closed { background: #f6f6f4; color: #ccc; cursor: default; }
-.heat td.sel { outline: 2px solid #185FA5; }
-.legend { display: flex; gap: 0.8rem; flex-wrap: wrap; font-size: 12.5px; color: #555; margin-bottom: 0.6rem; }
+.heat { border-collapse: separate; border-spacing: 3px; font-size: 12.5px; margin-top: 10px; font-variant-numeric: tabular-nums; }
+.heat th { font-weight: 500; color: var(--ink-faint); padding: 2px 6px; }
+.heat tr:first-child th { font-family: var(--hand); font-size: 22px; font-weight: 400; color: var(--ink); }
+.heat td { width: 72px; height: 26px; text-align: center; border-radius: 4px; cursor: pointer; color: var(--ink); font-weight: 500; }
+.heat td.closed { background: #F3F5F4; color: #C9D0D2; cursor: default; }
+.heat td.sel { outline: 3px solid var(--ink); outline-offset: 1px; }
+.legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 13px; color: var(--ink-soft); margin-bottom: 12px; }
 
-.install-bar { display: none; align-items: center; gap: 0.6rem; flex-wrap: wrap; background: #eef3fa; border: 1px solid #cfe0f2; border-radius: 10px; padding: 0.6rem 0.9rem; font-size: 13px; color: #24527f; margin-bottom: 1rem; }
+.install-bar { display: none; align-items: center; gap: 10px; flex-wrap: wrap; background: var(--board); border: 1.5px solid var(--frame); border-radius: 8px; padding: 10px 14px; font-size: 13.5px; color: var(--ink); margin-bottom: 18px; }
 .install-bar.show { display: flex; }
 .install-bar .spacer { flex: 1; }
-.notice { background: #fff8e6; border: 1px solid #f5dfa6; color: #7d5a00; border-radius: 10px; padding: 0.7rem 0.9rem; font-size: 13px; line-height: 1.6; margin-bottom: 1rem; }
+.notice { border-left: 4px solid var(--blue); background: var(--blue-wash); color: var(--ink); border-radius: 0 6px 6px 0; padding: 12px 16px; font-size: 14px; line-height: 1.7; margin: 20px 0 4px; }
 
+@media (max-width: 640px) {
+  body { padding: 20px 12px 40px; }
+  h1 { font-size: 38px; }
+  .board { padding: 4px 16px 20px; }
+  .tabs { padding: 0 4px; }
+  .tab-btn { padding: 8px 12px 7px; font-size: 13px; }
+}
 @media print {
   body { background: #fff; padding: 0; }
   .tabs, .no-print, details { display: none !important; }
+  .board { border: none; box-shadow: none; padding: 0; }
   .tab-panel { display: none !important; }
   #tab-result { display: block !important; }
-  .card { border: none; padding: 0.5rem 0; break-inside: avoid; }
+  .card { padding: 10px 0; break-inside: avoid; }
+  .week .ev { animation: none; }
 }
 </style>
 </head>
 <body>
 <div class="app">
-  <h1>시험대비 학교별 시간표 메이커</h1>
-  <p class="subtitle">학생마다 다른 학원 시간표와 이동시간을 넣으면, 학교별로 모두 모일 수 있는 시험대비 수업 시간을 찾아주고<br>다 못 모이면 대안·보강 시간을 제안해요.</p>
+  <header class="masthead">
+    <div>
+      <h1>시험대비 시간표</h1>
+      <p class="subtitle">학생들의 다른 학원 시간표와 이동시간을 넣으면, 학교별로 다 같이 모일 수 있는 시간을 찾아드려요. 다 못 모이면 대안 시간과 보강 시간을 제안해요.</p>
+    </div>
+  </header>
 
   <div class="install-bar no-print" id="installBar">
-    <span id="installText">📲 이 앱을 휴대폰·컴퓨터에 설치하면 인터넷 없이도 바로 열 수 있어요.</span>
+    <span id="installText">휴대폰이나 컴퓨터에 설치하면 인터넷 없이도 바로 열려요.</span>
     <span class="spacer"></span>
     <button class="btn small primary" id="btnInstall" hidden>앱 설치</button>
     <button class="btn small" id="btnCopyLink" hidden>링크 복사</button>
@@ -133,13 +192,14 @@ details summary { cursor: pointer; font-size: 13px; color: #185FA5; }
   </div>
 
   <div class="tabs no-print">
-    <button class="tab-btn active" data-tab="settings">① 기본 설정</button>
-    <button class="tab-btn" data-tab="students">② 학생 · 타학원 시간표 <span class="badge" id="stuCount">0</span></button>
-    <button class="tab-btn" data-tab="result">③ 시간표 결과</button>
-    <button class="tab-btn" data-tab="heat">④ 가용시간 한눈에 보기</button>
+    <button class="tab-btn active" data-tab="settings"><span class="step">1</span>기본 설정</button>
+    <button class="tab-btn" data-tab="students"><span class="step">2</span>학생 시간표 <span class="badge" id="stuCount">0</span></button>
+    <button class="tab-btn" data-tab="result"><span class="step">3</span>시간표 결과</button>
+    <button class="tab-btn" data-tab="heat"><span class="step">4</span>가용시간 지도</button>
   </div>
 
   <!-- ① settings -->
+  <main class="board">
   <section class="tab-panel active" id="tab-settings">
     <div class="card">
       <h2>수업 조건</h2>
@@ -154,7 +214,7 @@ details summary { cursor: pointer; font-size: 13px; color: #185FA5; }
 
     <div class="card">
       <h2>우리 학원 수업 가능 시간</h2>
-      <p class="hint">요일별로 시험대비 수업을 열 수 있는 시간대를 적어주세요. 여러 구간은 쉼표로: <code>14:00-17:00, 18:00-22:00</code> · 비우면 그 요일은 수업 없음</p>
+      <p class="hint">요일별로 시험대비 수업을 열 수 있는 시간대를 적어주세요. 여러 구간은 쉼표로: <code>14:00-17:00, 18:00-22:00</code>. 비워두면 그 요일은 수업이 없어요.</p>
       <table class="simple" id="hoursTable"></table>
     </div>
 
@@ -184,8 +244,8 @@ details summary { cursor: pointer; font-size: 13px; color: #185FA5; }
       <p class="hint" style="margin-bottom:0.4rem">한 줄에 하나씩 <code>요일 시작-끝 학원이름 이동N</code> 형식으로 적으면 돼요.</p>
       <p class="hint" style="margin-bottom:0">
         <code>월수금 17:00-19:00 수학학원</code> &nbsp; <code>화목 18:30-21:00 영어 이동20</code> &nbsp; <code>평일 16:00-17:00 피아노 이동5</code> &nbsp; <code>토 10-13 과학</code><br>
-        · 요일은 <code>월화수목금토일</code>, <code>평일</code>, <code>주말</code>, <code>매일</code> 사용 가능 · <code>이동20</code> = 그 학원과 우리학원 사이 이동 20분 (안 적으면 기본 이동시간)<br>
-        · 학원이 아닌 일정(병원, 과외 등)도 똑같이 적으면 돼요. 집에서 하는 과외처럼 이동이 없으면 <code>이동0</code>
+        요일은 <code>월화수목금토일</code>, <code>평일</code>, <code>주말</code>, <code>매일</code>로 적어요. <code>이동20</code>은 그 학원과 우리 학원 사이 이동 20분이에요 (안 적으면 기본 이동시간).<br>
+        학원이 아닌 일정(병원, 과외 등)도 똑같이 적으면 돼요. 집에서 하는 과외처럼 이동이 없으면 <code>이동0</code>
       </p>
     </div>
 
@@ -237,13 +297,15 @@ details summary { cursor: pointer; font-size: 13px; color: #185FA5; }
       <div id="heatDetail" style="margin-top:1rem"></div>
     </div>
   </section>
+  </main>
 </div>
 
 <script>
 /* ---------------- constants & helpers ---------------- */
 const STORAGE_KEY = 'examScheduleData';
 const DAYS = ['월', '화', '수', '목', '금', '토', '일'];
-const COLORS = ['#185FA5', '#1e8449', '#b9461e', '#7d3c98', '#b9770e', '#117a8b', '#c0392b', '#5d6d7e', '#a04000', '#2e4053'];
+// magnet colours, all dark enough for white text
+const COLORS = ['#2C63D6', '#17885A', '#D0621A', '#C8406C', '#6E4FD1', '#11879A', '#A87A00', '#7E5236', '#4A5A68', '#B8392C'];
 
 function genId() { return 's_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
 function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
@@ -567,7 +629,7 @@ function renderStudents() {
       card.querySelector('.chips').innerHTML =
         (!(s.school || '').trim() ? '<span class="chip err">학교를 입력해주세요</span>' : '') +
         (p.blocks.length || p.errors.length ? '' : '<span class="chip muted">타학원 일정 없음 (언제든 가능)</span>') +
-        p.blocks.map(b => `<span class="chip">${DAYS[b.day]} ${fmt(b.s)}~${fmt(b.e)} ${esc(b.label)} · 이동${b.travel ?? travel}분</span>`).join('') +
+        p.blocks.map(b => `<span class="chip">${DAYS[b.day]} ${fmt(b.s)}~${fmt(b.e)} ${esc(b.label)}, 이동 ${b.travel ?? travel}분</span>`).join('') +
         p.errors.map(e => `<span class="chip err">${esc(e)}</span>`).join('');
     };
     preview();
@@ -619,27 +681,27 @@ function renderResult() {
   let html = '';
 
   const fullCount = results.filter(r => r.chosen.length && r.chosen.every(c => c.avail.length === r.sc.members.length)).length;
-  html += `<div class="notice">총 ${results.length}개 학교 · ${model.students.length}명 · 수업 길이 ${[...new Set(results.flatMap(r => r.sc.durs))].sort((a, b) => a - b).join('·')}분. ` +
+  html += `<div class="notice">${results.length}개 학교, ${model.students.length}명의 시간표를 맞춰봤어요. ` +
     `<b>${fullCount}개 학교</b>는 모든 회차에 전원 참석 가능한 시간을 찾았어요.` +
-    (fullCount < results.length ? ' 나머지는 참석 인원이 가장 많은 시간 + 빠지는 학생용 보강 시간을 제안했어요.' : '') + '</div>';
+    (fullCount < results.length ? ' 나머지는 참석 인원이 가장 많은 시간과, 빠지는 학생을 위한 보강 시간을 제안했어요.' : '') + '</div>';
 
   html += `<div class="card"><h2>주간 시간표</h2><div class="legend">` +
     results.map(r => `<span><span class="dot" style="background:${schoolColor(r.sc.name)}"></span>${esc(r.sc.name)}</span>`).join('') +
-    `<span><span class="dot" style="border:2px dashed #888;background:#fff"></span>보강(제안)</span></div><div class="week-wrap">${renderWeek(model, results)}</div></div>`;
+    `<span><span class="dot" style="border:2px dashed var(--ink-soft);background:#fff;box-shadow:none;border-radius:3px"></span>보강 제안</span></div><div class="week-wrap">${renderWeek(model, results)}</div></div>`;
 
   results.forEach(r => {
     const total = r.sc.members.length, color = schoolColor(r.sc.name);
-    html += `<div class="card school-card" style="border-left-color:${color}"><h2>${esc(r.sc.name)} <span class="reason">${total}명 · 주 ${r.sc.sessions}회 · ${lengthLabel(r.sc.durs)}</span></h2>`;
+    html += `<div class="card school-card"><h2><span class="dot" style="background:${color}"></span>${esc(r.sc.name)} <span class="reason">${total}명, 주 ${r.sc.sessions}회, ${lengthLabel(r.sc.durs)}</span></h2>`;
     if (!r.chosen.length) html += '<p class="miss" style="font-size:13.5px">수업 가능한 시간이 없어요. 학원 수업 가능 시간이나 하교 시각, 동시 수업 수를 확인해주세요.</p>';
     if (r.chosen.length < r.sc.sessions && r.chosen.length) html += `<p class="miss" style="font-size:13px;margin-bottom:0.4rem">요청한 ${r.sc.sessions}회 중 ${r.chosen.length}회만 배정했어요 (가능한 시간이 부족해요).</p>`;
     r.chosen.forEach((c, i) => {
-      html += `<div class="session"><div class="when">${i + 1}회차 · ${fmtRange(c.day, c.s, c.e)}<br><span class="reason">${c.D}분</span> ${attendBadge(c.avail.length, total)}${c.pinned ? '<span class="badge">직접 고정</span>' : ''}${c.roomOk ? '' : '<span class="badge bad">다른 학교와 겹침</span>'}</div>
+      html += `<div class="session"><div class="when">${i + 1}회차 ${fmtRange(c.day, c.s, c.e)}<br><span class="reason">${c.D}분</span> ${attendBadge(c.avail.length, total)}${c.pinned ? '<span class="badge">직접 고정</span>' : ''}${c.roomOk ? '' : '<span class="badge bad">다른 학교와 겹침</span>'}</div>
         <div class="who">참석: ${c.avail.map(m => esc(m.name)).join(', ') || '-'}` +
         (c.missing.length ? `<br>${c.missing.map(x => `<span class="miss">✕ ${esc(x.st.name)}</span> <span class="reason">${esc(x.reason)}</span>`).join('<br>')}` : '') + `</div></div>`;
     });
     if (r.makeups.length) {
       html += `<h3>보강 제안 (빠지는 학생용)</h3>` + r.makeups.map(m =>
-        `<div class="alt"><span class="when">${fmtRange(m.day, m.s, m.e)} <span class="reason">${m.D}분</span></span><span>${m.covered.map(x => esc(x.name)).join(', ')}</span><span class="reason">· 이 시간엔 총 ${m.avail.length}명 가능</span></div>`).join('');
+        `<div class="alt"><span class="when">${fmtRange(m.day, m.s, m.e)} <span class="reason">${m.D}분</span></span><span>${m.covered.map(x => esc(x.name)).join(', ')}</span><span class="reason">(이 시간엔 총 ${m.avail.length}명 가능)</span></div>`).join('');
     }
     if (r.uncoveredAfterMakeup.length) {
       const names = r.sc.members.filter(m => r.uncoveredAfterMakeup.includes(m.id)).map(m => esc(m.name));
@@ -652,7 +714,7 @@ function renderResult() {
     r.alternatives.forEach(g => {
       const sameLen = r.chosen.map((c, i) => ({ c, i })).filter(x => x.c.D === g.D);
       const freeSlot = r.sc.durs.findIndex((D, slot) => D === g.D && !r.chosen.some(c => c.slot === slot));
-      html += `<details class="no-print"><summary>대안 시간 보기${multi ? ` (${g.D}분 회차)` : ''} · 참석 인원 많은 순</summary><div class="alt-list">` + g.list.map(a =>
+      html += `<details class="no-print"><summary>대안 시간 보기${multi ? ` (${g.D}분 회차)` : ''}</summary><div class="alt-list">` + g.list.map(a =>
         `<div class="alt"><span class="when">${fmtRange(a.day, a.s, a.e)}</span>${attendBadge(a.avail.length, total)}${a.roomOk ? '' : '<span class="badge bad">다른 수업과 겹침</span>'}
           <span class="reason">${a.missing.length ? '못 옴: ' + a.missing.map(x => esc(x.st.name)).join(', ') : '전원 가능'}</span>
           ${sameLen.map(({ c, i }) => `<button class="btn small" data-swap="${esc(r.sc.name)}" data-slot="${c.slot}" data-key="${a.key}">${i + 1}회차와 교체</button>`).join('')}
@@ -672,9 +734,10 @@ function renderResult() {
 function renderWeek(model, results) {
   const all = model.windows.flat();
   const items = results.flatMap(r => [
-    ...r.chosen.map((c, i) => ({ ...c, school: r.sc.name, title: `${r.sc.name} ${i + 1}회`, sub: `${c.D}분 · ${c.avail.length}/${r.sc.members.length}명` })),
+    ...r.chosen.map((c, i) => ({ ...c, school: r.sc.name, title: `${r.sc.name} ${i + 1}회`, sub: `${c.avail.length}/${r.sc.members.length}명, ${c.D}분` })),
     ...r.makeups.map(m => ({ ...m, school: r.sc.name, makeup: true, title: `${r.sc.name} 보강`, sub: m.covered.map(x => x.name).join(', ') })),
   ]);
+  items.forEach((it, k) => { it.order = k; });
   const lo = Math.floor(Math.min(...all.map(w => w.s), ...items.map(i => i.s)) / 60) * 60;
   const hi = Math.ceil(Math.max(...all.map(w => w.e), ...items.map(i => i.e)) / 60) * 60;
   const PX = 1.1, H = (hi - lo) * PX;
@@ -696,7 +759,7 @@ function renderWeek(model, results) {
       Array.from({ length: (hi - lo) / 60 }, (_, k) => `<div class="tick" style="top:${k * 60 * PX}px"></div>`).join('') +
       dayItems.map(it => {
         const color = schoolColor(it.school);
-        return `<div class="ev ${it.makeup ? 'makeup' : ''}" style="top:${(it.s - lo) * PX}px;height:${(it.e - it.s) * PX - 2}px;background:${color};border-color:${color};left:calc(${it.lane / n * 100}% + 3px);right:auto;width:calc(${100 / n}% - 6px)" title="${esc(it.title + ' ' + fmt(it.s) + '~' + fmt(it.e) + ' · ' + it.sub)}"><b>${esc(it.title)}</b>${fmt(it.s)}~${fmt(it.e)}<br>${esc(it.sub)}</div>`;
+        return `<div class="ev ${it.makeup ? 'makeup' : ''}" style="--i:${it.order};top:${(it.s - lo) * PX}px;height:${(it.e - it.s) * PX - 2}px;background:${color};border-color:${color};left:calc(${it.lane / n * 100}% + 3px);right:auto;width:calc(${100 / n}% - 6px)" title="${esc(it.title + ' ' + fmt(it.s) + '~' + fmt(it.e) + ', ' + it.sub)}"><b>${esc(it.title)}</b>${fmt(it.s)}~${fmt(it.e)}<br>${esc(it.sub)}</div>`;
       }).join('') + '</div>';
   });
   return html + '</div>';
@@ -732,10 +795,10 @@ function renderHeat() {
       if (!c) return '<td class="closed">·</td>';
       const ratio = total ? c.avail.length / total : 0;
       const bg = ratio === 1 ? color : `color-mix(in srgb, ${color} ${Math.round(ratio * 70)}%, #fff)`;
-      return `<td data-key="${c.key}" class="${heatSel === c.key ? 'sel' : ''}" style="background:${bg};color:${ratio > 0.6 ? '#fff' : '#333'}">${c.avail.length}${ratio === 1 ? ' ★' : ''}</td>`;
+      return `<td data-key="${c.key}" class="${heatSel === c.key ? 'sel' : ''}" style="background:${bg};color:${ratio > 0.8 ? '#fff' : 'var(--ink)'}">${c.avail.length}${ratio === 1 ? ' ★' : ''}</td>`;
     }).join('') + '</tr>';
   });
-  wrap.innerHTML = html + '</table><p class="reason" style="margin-top:0.4rem">★ = 전원 가능 · 진할수록 많이 올 수 있어요</p>';
+  wrap.innerHTML = html + '</table><p class="reason" style="margin-top:0.4rem">★ 전원 가능. 색이 진할수록 많이 올 수 있어요.</p>';
   wrap.querySelectorAll('td[data-key]').forEach(td => td.addEventListener('click', () => { heatSel = td.dataset.key; renderHeat(); }));
   const c = heatSel && byKey[heatSel];
   detail.innerHTML = c ? `<h3>${fmtRange(c.day, c.s, c.e)} ${attendBadge(c.avail.length, total)}</h3>
@@ -799,7 +862,7 @@ function installBarHidden() { try { return localStorage.getItem('installBarHidde
 if (isOnline && 'serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 if (isOnline && !isStandalone && !installBarHidden()) {
   const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-  if (isIOS) document.getElementById('installText').textContent = '📲 아이폰·아이패드: Safari 아래쪽 공유 버튼(□↑) → "홈 화면에 추가"를 누르면 앱처럼 설치돼요.';
+  if (isIOS) document.getElementById('installText').textContent = '아이폰, 아이패드: Safari 아래쪽 공유 버튼(□↑)에서 "홈 화면에 추가"를 누르면 앱처럼 설치돼요.';
   document.getElementById('btnCopyLink').hidden = !navigator.clipboard;
   installBar.classList.add('show');
 }
