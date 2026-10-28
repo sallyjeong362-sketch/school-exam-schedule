@@ -127,7 +127,7 @@ details summary { cursor: pointer; font-size: 13px; color: #185FA5; }
     <div class="card">
       <h2>수업 조건</h2>
       <div class="grid-form">
-        <div class="field"><label>수업 1회 길이 (분)</label><input type="number" id="setDuration" min="30" step="10"><small>예: 90 → 1시간 30분 수업</small></div>
+        <div class="field"><label>수업 1회 길이 (분)</label><input type="number" id="setDuration" min="30" step="10"><small>기본값. 학교마다 다르게 하려면 아래 표에서</small></div>
         <div class="field"><label>시작 시각 단위 (분)</label><select id="setStep"><option value="10">10분</option><option value="15">15분</option><option value="30">30분</option><option value="60">60분</option></select><small>수업 시작 시간을 몇 분 간격으로 찾을지</small></div>
         <div class="field"><label>기본 이동시간 (분)</label><input type="number" id="setTravel" min="0" step="5"><small>타학원 ↔ 우리학원. 학원별로 따로 적을 수도 있어요</small></div>
         <div class="field"><label>학교별 주당 수업 횟수</label><input type="number" id="setSessions" min="1" max="7"><small>학교마다 다르게 하려면 아래 표에서</small></div>
@@ -214,7 +214,7 @@ details summary { cursor: pointer; font-size: 13px; color: #185FA5; }
   <section class="tab-panel" id="tab-heat">
     <div class="card">
       <h2>학교별 가용 인원 지도</h2>
-      <p class="hint">칸에 적힌 숫자는 <b>그 시각에 수업을 시작하면</b> (수업 길이 + 이동시간을 반영해서) 올 수 있는 학생 수예요. 칸을 누르면 누가 왜 못 오는지 보여줘요.</p>
+      <p class="hint">칸에 적힌 숫자는 <b>그 시각에 수업을 시작하면</b> (그 학교 수업 길이 + 이동시간을 반영해서) 올 수 있는 학생 수예요. 칸을 누르면 누가 왜 못 오는지 보여줘요.</p>
       <div class="row"><label>학교</label><select id="heatSchool"></select></div>
       <div id="heatWrap" style="overflow-x:auto"></div>
       <div id="heatDetail" style="margin-top:1rem"></div>
@@ -245,7 +245,7 @@ function defaultState() {
   return {
     settings: { duration: 90, step: 30, travel: 15, sessions: 2, rooms: 1 },
     hours: ['15:00-22:00', '15:00-22:00', '15:00-22:00', '15:00-22:00', '15:00-22:00', '10:00-18:00', ''],
-    schoolCfg: {},   // name -> { arrive, weekendArrive, sessions }
+    schoolCfg: {},   // name -> { arrive, weekendArrive, sessions, duration }
     students: [],    // { id, name, school, text }
     pins: {},        // school -> ["day-start", ...] manually chosen sessions
   };
@@ -262,7 +262,7 @@ function save() {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) { /* storage unavailable */ }
 }
 function schoolCfg(name) {
-  if (!state.schoolCfg[name]) state.schoolCfg[name] = { arrive: '16:30', weekendArrive: '09:00', sessions: '' };
+  if (!state.schoolCfg[name]) state.schoolCfg[name] = { arrive: '16:30', weekendArrive: '09:00', sessions: '', duration: '' };
   return state.schoolCfg[name];
 }
 function schoolNames() {
@@ -323,7 +323,7 @@ function parseHours(text) {
 /* ---------------- core: availability ---------------- */
 function buildModel() {
   const st = state.settings;
-  const D = Math.max(10, +st.duration || 90), step = Math.max(5, +st.step || 30), defTravel = Math.max(0, +st.travel || 0);
+  const defD = Math.max(10, +st.duration || 90), step = Math.max(5, +st.step || 30), defTravel = Math.max(0, +st.travel || 0);
   const windows = DAYS.map((_, d) => parseHours(state.hours[d]));
   const students = state.students.filter(s => (s.school || '').trim()).map(s => {
     const p = parseSchedule(s.text);
@@ -334,6 +334,7 @@ function buildModel() {
     const members = students.filter(s => s.school === name);
     const arrive = parseClock(cfg.arrive) ?? 0, weekendArrive = parseClock(cfg.weekendArrive) ?? 0;
     const sessions = Math.max(1, +cfg.sessions || +st.sessions || 1);
+    const D = Math.max(10, +cfg.duration || defD);
     const candidates = [];
     windows.forEach((ws, day) => ws.forEach(w => {
       for (let t = w.s; t + D <= w.e; t += step) {
@@ -345,9 +346,9 @@ function buildModel() {
         candidates.push({ day, s: t, e: t + D, key: day + '-' + t, avail, missing });
       }
     }));
-    return { name, members, sessions, candidates };
+    return { name, members, sessions, D, candidates };
   });
-  return { D, step, windows, students, schools };
+  return { D: defD, step, windows, students, schools };
 }
 function conflictReason(stu, day, s, e, arrive) {
   if (s < arrive) return `하교 후 ${fmt(arrive)}부터 가능`;
@@ -471,12 +472,13 @@ function renderSchoolTable() {
   const names = schoolNames();
   const wrap = document.getElementById('schoolTableWrap');
   if (!names.length) { wrap.innerHTML = '<p class="empty-note">학생을 먼저 입력하면 학교가 여기에 나타나요.</p>'; return; }
-  wrap.innerHTML = `<table class="simple"><tr><th>학교</th><th>학생 수</th><th>평일 도착 가능</th><th>주말 도착 가능</th><th>주당 횟수</th></tr>` +
+  wrap.innerHTML = `<table class="simple"><tr><th>학교</th><th>학생 수</th><th>평일 도착 가능</th><th>주말 도착 가능</th><th>수업 길이(분)</th><th>주당 횟수</th></tr>` +
     names.map(n => {
       const c = schoolCfg(n), cnt = state.students.filter(s => (s.school || '').trim() === n).length;
       return `<tr><td><span class="dot" style="background:${schoolColor(n)}"></span>${esc(n)}</td><td>${cnt}명</td>
         <td><input type="time" data-school="${esc(n)}" data-k="arrive" value="${esc(c.arrive)}"></td>
         <td><input type="time" data-school="${esc(n)}" data-k="weekendArrive" value="${esc(c.weekendArrive)}"></td>
+        <td><input type="number" min="10" step="10" style="width:80px" data-school="${esc(n)}" data-k="duration" value="${esc(c.duration)}" placeholder="${esc(state.settings.duration)}"></td>
         <td><input type="number" min="1" max="7" style="width:70px" data-school="${esc(n)}" data-k="sessions" value="${esc(c.sessions)}" placeholder="${esc(state.settings.sessions)}"></td></tr>`;
     }).join('') + '</table>';
   wrap.querySelectorAll('[data-school]').forEach(inp => inp.addEventListener('input', () => {
@@ -574,7 +576,7 @@ function renderResult() {
   let html = '';
 
   const fullCount = results.filter(r => r.chosen.length && r.chosen.every(c => c.avail.length === r.sc.members.length)).length;
-  html += `<div class="notice">총 ${results.length}개 학교 · ${model.students.length}명 · 수업 ${model.D}분 기준. ` +
+  html += `<div class="notice">총 ${results.length}개 학교 · ${model.students.length}명 · 수업 길이 ${[...new Set(results.map(r => r.sc.D))].sort((a, b) => a - b).join('·')}분. ` +
     `<b>${fullCount}개 학교</b>는 모든 회차에 전원 참석 가능한 시간을 찾았어요.` +
     (fullCount < results.length ? ' 나머지는 참석 인원이 가장 많은 시간 + 빠지는 학생용 보강 시간을 제안했어요.' : '') + '</div>';
 
@@ -584,7 +586,7 @@ function renderResult() {
 
   results.forEach(r => {
     const total = r.sc.members.length, color = schoolColor(r.sc.name);
-    html += `<div class="card school-card" style="border-left-color:${color}"><h2>${esc(r.sc.name)} <span class="reason">${total}명 · 주 ${r.sc.sessions}회</span></h2>`;
+    html += `<div class="card school-card" style="border-left-color:${color}"><h2>${esc(r.sc.name)} <span class="reason">${total}명 · ${r.sc.D}분 · 주 ${r.sc.sessions}회</span></h2>`;
     if (!r.chosen.length) html += '<p class="miss" style="font-size:13.5px">수업 가능한 시간이 없어요. 학원 수업 가능 시간이나 하교 시각, 동시 수업 수를 확인해주세요.</p>';
     if (r.chosen.length < r.sc.sessions && r.chosen.length) html += `<p class="miss" style="font-size:13px;margin-bottom:0.4rem">요청한 ${r.sc.sessions}회 중 ${r.chosen.length}회만 배정했어요 (가능한 시간이 부족해요).</p>`;
     r.chosen.forEach((c, i) => {
@@ -716,8 +718,8 @@ document.getElementById('btnSample').addEventListener('click', () => {
   state = defaultState();
   state.schoolCfg = {
     '대치중': { arrive: '16:20', weekendArrive: '09:00', sessions: '' },
-    '단대부중': { arrive: '16:40', weekendArrive: '09:00', sessions: '' },
-    '휘문중': { arrive: '16:10', weekendArrive: '09:00', sessions: '3' },
+    '단대부중': { arrive: '16:40', weekendArrive: '09:00', sessions: '', duration: '60' },
+    '휘문중': { arrive: '16:10', weekendArrive: '09:00', sessions: '3', duration: '120' },
   };
   state.students = [
     S('김민수', '대치중', '월수 17:00-19:00 수학학원 이동15\n화목 18:00-20:00 영어학원'),
