@@ -1,0 +1,15 @@
+{
+  "name": "시험대비 학교별 시간표 메이커",
+  "short_name": "시험대비 시간표",
+  "description": "학생마다 다른 학원 시간표와 이동시간을 반영해 학교별 시험대비 수업 시간을 짜 주는 앱",
+  "lang": "ko",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f5f5f3",
+  "theme_color": "#185FA5",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

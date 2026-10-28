@@ -4,6 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>시험대비 학교별 시간표 메이커</title>
+<meta name="theme-color" content="#185FA5">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="시험대비 시간표">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; background: #f5f5f3; min-height: 100vh; display: flex; justify-content: center; padding: 2rem 1rem; color: #2c2c2a; }
@@ -99,6 +105,9 @@ details summary { cursor: pointer; font-size: 13px; color: #185FA5; }
 .heat td.sel { outline: 2px solid #185FA5; }
 .legend { display: flex; gap: 0.8rem; flex-wrap: wrap; font-size: 12.5px; color: #555; margin-bottom: 0.6rem; }
 
+.install-bar { display: none; align-items: center; gap: 0.6rem; flex-wrap: wrap; background: #eef3fa; border: 1px solid #cfe0f2; border-radius: 10px; padding: 0.6rem 0.9rem; font-size: 13px; color: #24527f; margin-bottom: 1rem; }
+.install-bar.show { display: flex; }
+.install-bar .spacer { flex: 1; }
 .notice { background: #fff8e6; border: 1px solid #f5dfa6; color: #7d5a00; border-radius: 10px; padding: 0.7rem 0.9rem; font-size: 13px; line-height: 1.6; margin-bottom: 1rem; }
 
 @media print {
@@ -114,6 +123,14 @@ details summary { cursor: pointer; font-size: 13px; color: #185FA5; }
 <div class="app">
   <h1>시험대비 학교별 시간표 메이커</h1>
   <p class="subtitle">학생마다 다른 학원 시간표와 이동시간을 넣으면, 학교별로 모두 모일 수 있는 시험대비 수업 시간을 찾아주고<br>다 못 모이면 대안·보강 시간을 제안해요.</p>
+
+  <div class="install-bar no-print" id="installBar">
+    <span id="installText">📲 이 앱을 휴대폰·컴퓨터에 설치하면 인터넷 없이도 바로 열 수 있어요.</span>
+    <span class="spacer"></span>
+    <button class="btn small primary" id="btnInstall" hidden>앱 설치</button>
+    <button class="btn small" id="btnCopyLink" hidden>링크 복사</button>
+    <button class="btn small" id="btnHideInstall">닫기</button>
+  </div>
 
   <div class="tabs no-print">
     <button class="tab-btn active" data-tab="settings">① 기본 설정</button>
@@ -215,7 +232,7 @@ details summary { cursor: pointer; font-size: 13px; color: #185FA5; }
     <div class="card">
       <h2>학교별 가용 인원 지도</h2>
       <p class="hint">칸에 적힌 숫자는 <b>그 시각에 수업을 시작하면</b> (그 학교 수업 길이 + 이동시간을 반영해서) 올 수 있는 학생 수예요. 칸을 누르면 누가 왜 못 오는지 보여줘요.</p>
-      <div class="row"><label>학교</label><select id="heatSchool"></select></div>
+      <div class="row"><label>학교</label><select id="heatSchool"></select><label id="heatLenLabel">수업 길이</label><select id="heatLen"></select></div>
       <div id="heatWrap" style="overflow-x:auto"></div>
       <div id="heatDetail" style="margin-top:1rem"></div>
     </div>
@@ -333,22 +350,34 @@ function buildModel() {
     const cfg = schoolCfg(name);
     const members = students.filter(s => s.school === name);
     const arrive = parseClock(cfg.arrive) ?? 0, weekendArrive = parseClock(cfg.weekendArrive) ?? 0;
-    const sessions = Math.max(1, +cfg.sessions || +st.sessions || 1);
-    const D = Math.max(10, +cfg.duration || defD);
-    const candidates = [];
-    windows.forEach((ws, day) => ws.forEach(w => {
-      for (let t = w.s; t + D <= w.e; t += step) {
-        const avail = [], missing = [];
-        members.forEach(m => {
-          const r = conflictReason(m, day, t, t + D, day < 5 ? arrive : weekendArrive);
-          if (r) missing.push({ st: m, reason: r }); else avail.push(m);
-        });
-        candidates.push({ day, s: t, e: t + D, key: day + '-' + t, avail, missing });
-      }
-    }));
-    return { name, members, sessions, D, candidates };
+    // "90" = every session 90 min; "90, 180" = 1st session 90, 2nd 180 (last value repeats)
+    const lens = parseLengths(cfg.duration);
+    const sessions = Math.max(1, +cfg.sessions || (lens.length > 1 ? lens.length : +st.sessions) || 1);
+    if (!lens.length) lens.push(defD);
+    const durs = Array.from({ length: sessions }, (_, i) => lens[Math.min(i, lens.length - 1)]);
+    const cands = {};
+    [...new Set(durs)].forEach(D => {
+      const list = cands[D] = [];
+      windows.forEach((ws, day) => ws.forEach(w => {
+        for (let t = w.s; t + D <= w.e; t += step) {
+          const avail = [], missing = [];
+          members.forEach(m => {
+            const r = conflictReason(m, day, t, t + D, day < 5 ? arrive : weekendArrive);
+            if (r) missing.push({ st: m, reason: r }); else avail.push(m);
+          });
+          list.push({ day, s: t, e: t + D, D, key: `${day}-${t}-${D}`, avail, missing });
+        }
+      }));
+    });
+    return { name, members, sessions, durs, cands, candidates: cands[durs[0]] };
   });
   return { D: defD, step, windows, students, schools };
+}
+function parseLengths(text) {
+  return String(text ?? '').split(/[,\s/]+/).map(x => +x).filter(x => x >= 10);
+}
+function lengthLabel(durs) {
+  return new Set(durs).size === 1 ? `${durs[0]}분` : durs.map(d => d + '분').join(' / ');
 }
 function conflictReason(stu, day, s, e, arrive) {
   if (s < arrive) return `하교 후 ${fmt(arrive)}부터 가능`;
@@ -372,22 +401,25 @@ function plan(model) {
 
   // most constrained schools first: fewest slots where the best attendance is reached
   const order = model.schools.filter(sc => sc.members.length).map(sc => {
-    const best = Math.max(0, ...sc.candidates.map(c => c.avail.length));
-    const nBest = sc.candidates.filter(c => c.avail.length === best).length;
+    const longest = sc.cands[Math.max(...sc.durs)];
+    const best = Math.max(0, ...longest.map(c => c.avail.length));
+    const nBest = longest.filter(c => c.avail.length === best).length;
     return { sc, ratio: best / sc.members.length, nBest };
   }).sort((a, b) => a.ratio - b.ratio || a.nBest - b.nBest).map(x => x.sc);
 
   const results = [];
   for (const sc of order) {
     const chosen = [];
-    const byKey = Object.fromEntries(sc.candidates.map(c => [c.key, c]));
-    (state.pins[sc.name] || []).forEach(k => {
-      const c = byKey[k];
-      if (c && chosen.length < sc.sessions && !overlapsChosen(c, chosen)) { chosen.push({ ...c, pinned: true, roomOk: fits(c) }); take(c); }
+    const pins = state.pins[sc.name] || [];
+    sc.durs.forEach((D, slot) => {
+      const c = sc.cands[D].find(x => x.key === pins[slot]);
+      if (c && !overlapsChosen(c, chosen)) { chosen.push({ ...c, slot, pinned: true, roomOk: fits(c) }); take(c); }
     });
-    while (chosen.length < sc.sessions) {
+    // fill the remaining sessions, longest first since they are the hardest to place
+    const open = sc.durs.map((D, slot) => ({ D, slot })).filter(x => !chosen.some(c => c.slot === x.slot)).sort((a, b) => b.D - a.D);
+    for (const { D, slot } of open) {
       let best = null, bestScore = -Infinity;
-      for (const c of sc.candidates) {
+      for (const c of sc.cands[D]) {
         if (!c.avail.length || !fits(c) || overlapsChosen(c, chosen)) continue;
         const sameDay = chosen.filter(x => x.day === c.day).length;
         const gap = chosen.length ? Math.min(...chosen.map(x => Math.abs(x.day - c.day))) : 0;
@@ -395,8 +427,8 @@ function plan(model) {
         const score = c.avail.length * 1000 - sameDay * 600 + Math.min(gap, 3) * 20 - c.s / 100;
         if (score > bestScore) { bestScore = score; best = c; }
       }
-      if (!best) break;
-      chosen.push({ ...best, roomOk: true });
+      if (!best) continue;
+      chosen.push({ ...best, slot, roomOk: true });
       take(best);
     }
     chosen.sort((a, b) => a.day - b.day || a.s - b.s);
@@ -404,34 +436,45 @@ function plan(model) {
     // who misses how many sessions
     const attended = new Map(sc.members.map(m => [m.id, 0]));
     chosen.forEach(c => c.avail.forEach(m => attended.set(m.id, attended.get(m.id) + 1)));
-    const need = new Set(sc.members.filter(m => attended.get(m.id) < chosen.length || !chosen.length).map(m => m.id));
-    const neverFree = sc.members.filter(m => !sc.candidates.some(c => c.avail.includes(m)));
-    neverFree.forEach(m => need.delete(m.id));
+    const shortest = sc.cands[Math.min(...sc.durs)];
+    const neverFree = sc.members.filter(m => !shortest.some(c => c.avail.includes(m)));
+    const free = new Set(sc.members.filter(m => !neverFree.includes(m)).map(m => m.id));
 
-    // makeup suggestions: greedy cover of students who miss a session
+    // makeup suggestions, per session length: greedy cover of students who missed a session of that length
     const makeups = [];
-    const remaining = new Set(need);
-    while (remaining.size && makeups.length < 4) {
-      let best = null, bestCov = 0;
-      for (const c of sc.candidates) {
-        if (chosen.some(x => x.key === c.key) || makeups.some(x => x.key === c.key) || !fits(c)) continue;
-        const cov = c.avail.filter(m => remaining.has(m.id)).length;
-        if (cov > bestCov || (cov === bestCov && cov > 0 && best && c.avail.length > best.avail.length)) { bestCov = cov; best = c; }
+    const uncovered = new Set();
+    const missedByLen = {};
+    if (!chosen.length) missedByLen[sc.durs[0]] = new Set(free);
+    chosen.forEach(c => c.missing.forEach(x => { if (free.has(x.st.id)) (missedByLen[c.D] ||= new Set()).add(x.st.id); }));
+    Object.entries(missedByLen).sort((a, b) => b[0] - a[0]).forEach(([D, remaining]) => {
+      let count = 0;
+      while (remaining.size && count < 4) {
+        let best = null, bestCov = 0;
+        for (const c of sc.cands[D]) {
+          if (chosen.some(x => x.key === c.key) || makeups.some(x => x.key === c.key) || !fits(c)) continue;
+          const cov = c.avail.filter(m => remaining.has(m.id)).length;
+          if (cov > bestCov || (cov === bestCov && cov > 0 && best && c.avail.length > best.avail.length)) { bestCov = cov; best = c; }
+        }
+        if (!best) break;
+        const covered = best.avail.filter(m => remaining.has(m.id));
+        covered.forEach(m => remaining.delete(m.id));
+        makeups.push({ ...best, covered }); count++;
+        take(best);
       }
-      if (!best) break;
-      const covered = best.avail.filter(m => remaining.has(m.id));
-      covered.forEach(m => remaining.delete(m.id));
-      makeups.push({ ...best, covered });
-      take(best);
-    }
+      remaining.forEach(id => uncovered.add(id));
+    });
 
-    const alternatives = sc.candidates
-      .filter(c => c.avail.length && !chosen.some(x => x.key === c.key))
-      .sort((a, b) => b.avail.length - a.avail.length || a.day - b.day || a.s - b.s)
-      .slice(0, 10)
-      .map(c => ({ ...c, roomOk: fits(c) }));
+    // alternatives for each distinct session length
+    const alternatives = [...new Set(sc.durs)].map(D => ({
+      D,
+      list: sc.cands[D]
+        .filter(c => c.avail.length && !chosen.some(x => x.key === c.key))
+        .sort((a, b) => b.avail.length - a.avail.length || a.day - b.day || a.s - b.s)
+        .slice(0, 10)
+        .map(c => ({ ...c, roomOk: fits(c) })),
+    })).filter(g => g.list.length);
 
-    results.push({ sc, chosen, makeups, alternatives, attended, neverFree, uncoveredAfterMakeup: [...remaining] });
+    results.push({ sc, chosen, makeups, alternatives, attended, neverFree, uncoveredAfterMakeup: [...uncovered] });
   }
   return results.sort((a, b) => naturalCompare(a.sc.name, b.sc.name));
 }
@@ -472,13 +515,13 @@ function renderSchoolTable() {
   const names = schoolNames();
   const wrap = document.getElementById('schoolTableWrap');
   if (!names.length) { wrap.innerHTML = '<p class="empty-note">학생을 먼저 입력하면 학교가 여기에 나타나요.</p>'; return; }
-  wrap.innerHTML = `<table class="simple"><tr><th>학교</th><th>학생 수</th><th>평일 도착 가능</th><th>주말 도착 가능</th><th>수업 길이(분)</th><th>주당 횟수</th></tr>` +
+  wrap.innerHTML = `<table class="simple"><tr><th>학교</th><th>학생 수</th><th>평일 도착 가능</th><th>주말 도착 가능</th><th>수업 길이(분)<br><small style="font-weight:400">회차마다 다르면 90, 180</small></th><th>주당 횟수</th></tr>` +
     names.map(n => {
       const c = schoolCfg(n), cnt = state.students.filter(s => (s.school || '').trim() === n).length;
       return `<tr><td><span class="dot" style="background:${schoolColor(n)}"></span>${esc(n)}</td><td>${cnt}명</td>
         <td><input type="time" data-school="${esc(n)}" data-k="arrive" value="${esc(c.arrive)}"></td>
         <td><input type="time" data-school="${esc(n)}" data-k="weekendArrive" value="${esc(c.weekendArrive)}"></td>
-        <td><input type="number" min="10" step="10" style="width:80px" data-school="${esc(n)}" data-k="duration" value="${esc(c.duration)}" placeholder="${esc(state.settings.duration)}"></td>
+        <td><input type="text" inputmode="numeric" style="width:110px" data-school="${esc(n)}" data-k="duration" value="${esc(c.duration)}" placeholder="${esc(state.settings.duration)}"></td>
         <td><input type="number" min="1" max="7" style="width:70px" data-school="${esc(n)}" data-k="sessions" value="${esc(c.sessions)}" placeholder="${esc(state.settings.sessions)}"></td></tr>`;
     }).join('') + '</table>';
   wrap.querySelectorAll('[data-school]').forEach(inp => inp.addEventListener('input', () => {
@@ -576,7 +619,7 @@ function renderResult() {
   let html = '';
 
   const fullCount = results.filter(r => r.chosen.length && r.chosen.every(c => c.avail.length === r.sc.members.length)).length;
-  html += `<div class="notice">총 ${results.length}개 학교 · ${model.students.length}명 · 수업 길이 ${[...new Set(results.map(r => r.sc.D))].sort((a, b) => a - b).join('·')}분. ` +
+  html += `<div class="notice">총 ${results.length}개 학교 · ${model.students.length}명 · 수업 길이 ${[...new Set(results.flatMap(r => r.sc.durs))].sort((a, b) => a - b).join('·')}분. ` +
     `<b>${fullCount}개 학교</b>는 모든 회차에 전원 참석 가능한 시간을 찾았어요.` +
     (fullCount < results.length ? ' 나머지는 참석 인원이 가장 많은 시간 + 빠지는 학생용 보강 시간을 제안했어요.' : '') + '</div>';
 
@@ -586,17 +629,17 @@ function renderResult() {
 
   results.forEach(r => {
     const total = r.sc.members.length, color = schoolColor(r.sc.name);
-    html += `<div class="card school-card" style="border-left-color:${color}"><h2>${esc(r.sc.name)} <span class="reason">${total}명 · ${r.sc.D}분 · 주 ${r.sc.sessions}회</span></h2>`;
+    html += `<div class="card school-card" style="border-left-color:${color}"><h2>${esc(r.sc.name)} <span class="reason">${total}명 · 주 ${r.sc.sessions}회 · ${lengthLabel(r.sc.durs)}</span></h2>`;
     if (!r.chosen.length) html += '<p class="miss" style="font-size:13.5px">수업 가능한 시간이 없어요. 학원 수업 가능 시간이나 하교 시각, 동시 수업 수를 확인해주세요.</p>';
     if (r.chosen.length < r.sc.sessions && r.chosen.length) html += `<p class="miss" style="font-size:13px;margin-bottom:0.4rem">요청한 ${r.sc.sessions}회 중 ${r.chosen.length}회만 배정했어요 (가능한 시간이 부족해요).</p>`;
     r.chosen.forEach((c, i) => {
-      html += `<div class="session"><div class="when">${i + 1}회차 · ${fmtRange(c.day, c.s, c.e)}<br>${attendBadge(c.avail.length, total)}${c.pinned ? '<span class="badge">직접 고정</span>' : ''}${c.roomOk ? '' : '<span class="badge bad">다른 학교와 겹침</span>'}</div>
+      html += `<div class="session"><div class="when">${i + 1}회차 · ${fmtRange(c.day, c.s, c.e)}<br><span class="reason">${c.D}분</span> ${attendBadge(c.avail.length, total)}${c.pinned ? '<span class="badge">직접 고정</span>' : ''}${c.roomOk ? '' : '<span class="badge bad">다른 학교와 겹침</span>'}</div>
         <div class="who">참석: ${c.avail.map(m => esc(m.name)).join(', ') || '-'}` +
         (c.missing.length ? `<br>${c.missing.map(x => `<span class="miss">✕ ${esc(x.st.name)}</span> <span class="reason">${esc(x.reason)}</span>`).join('<br>')}` : '') + `</div></div>`;
     });
     if (r.makeups.length) {
       html += `<h3>보강 제안 (빠지는 학생용)</h3>` + r.makeups.map(m =>
-        `<div class="alt"><span class="when">${fmtRange(m.day, m.s, m.e)}</span><span>${m.covered.map(x => esc(x.name)).join(', ')}</span><span class="reason">· 이 시간엔 총 ${m.avail.length}명 가능</span></div>`).join('');
+        `<div class="alt"><span class="when">${fmtRange(m.day, m.s, m.e)} <span class="reason">${m.D}분</span></span><span>${m.covered.map(x => esc(x.name)).join(', ')}</span><span class="reason">· 이 시간엔 총 ${m.avail.length}명 가능</span></div>`).join('');
     }
     if (r.uncoveredAfterMakeup.length) {
       const names = r.sc.members.filter(m => r.uncoveredAfterMakeup.includes(m.id)).map(m => esc(m.name));
@@ -605,28 +648,31 @@ function renderResult() {
     if (r.neverFree.length) {
       html += `<p class="miss" style="font-size:13px;margin-top:0.5rem">⚠ 학원 수업 가능 시간 안에 비는 시간이 전혀 없는 학생: ${r.neverFree.map(m => esc(m.name)).join(', ')} — 개별 일정 조율이 필요해요.</p>`;
     }
-    if (r.alternatives.length) {
-      html += `<details class="no-print"><summary>대안 시간 보기 (참석 인원 많은 순)</summary><div class="alt-list">` + r.alternatives.map(a =>
+    const multi = r.alternatives.length > 1;
+    r.alternatives.forEach(g => {
+      const sameLen = r.chosen.map((c, i) => ({ c, i })).filter(x => x.c.D === g.D);
+      const freeSlot = r.sc.durs.findIndex((D, slot) => D === g.D && !r.chosen.some(c => c.slot === slot));
+      html += `<details class="no-print"><summary>대안 시간 보기${multi ? ` (${g.D}분 회차)` : ''} · 참석 인원 많은 순</summary><div class="alt-list">` + g.list.map(a =>
         `<div class="alt"><span class="when">${fmtRange(a.day, a.s, a.e)}</span>${attendBadge(a.avail.length, total)}${a.roomOk ? '' : '<span class="badge bad">다른 수업과 겹침</span>'}
           <span class="reason">${a.missing.length ? '못 옴: ' + a.missing.map(x => esc(x.st.name)).join(', ') : '전원 가능'}</span>
-          ${r.chosen.map((c, i) => `<button class="btn small" data-swap="${esc(r.sc.name)}" data-idx="${i}" data-key="${a.key}">${i + 1}회차와 교체</button>`).join('')}
-          ${r.chosen.length < r.sc.sessions ? `<button class="btn small" data-swap="${esc(r.sc.name)}" data-idx="${r.chosen.length}" data-key="${a.key}">회차로 추가</button>` : ''}
+          ${sameLen.map(({ c, i }) => `<button class="btn small" data-swap="${esc(r.sc.name)}" data-slot="${c.slot}" data-key="${a.key}">${i + 1}회차와 교체</button>`).join('')}
+          ${freeSlot >= 0 ? `<button class="btn small" data-swap="${esc(r.sc.name)}" data-slot="${freeSlot}" data-key="${a.key}">회차로 추가</button>` : ''}
         </div>`).join('') + `</div></details>`;
-    }
+    });
     html += '</div>';
   });
   wrap.innerHTML = html;
   wrap.querySelectorAll('[data-swap]').forEach(btn => btn.addEventListener('click', () => {
     const r = results.find(x => x.sc.name === btn.dataset.swap);
-    const keys = r.chosen.map(c => c.key);
-    keys[+btn.dataset.idx] = btn.dataset.key;
+    const keys = r.sc.durs.map((_, slot) => r.chosen.find(c => c.slot === slot)?.key || null);
+    keys[+btn.dataset.slot] = btn.dataset.key;
     state.pins[r.sc.name] = keys; save(); renderResult();
   }));
 }
 function renderWeek(model, results) {
   const all = model.windows.flat();
   const items = results.flatMap(r => [
-    ...r.chosen.map((c, i) => ({ ...c, school: r.sc.name, title: `${r.sc.name} ${i + 1}회`, sub: `${c.avail.length}/${r.sc.members.length}명` })),
+    ...r.chosen.map((c, i) => ({ ...c, school: r.sc.name, title: `${r.sc.name} ${i + 1}회`, sub: `${c.D}분 · ${c.avail.length}/${r.sc.members.length}명` })),
     ...r.makeups.map(m => ({ ...m, school: r.sc.name, makeup: true, title: `${r.sc.name} 보강`, sub: m.covered.map(x => x.name).join(', ') })),
   ]);
   const lo = Math.floor(Math.min(...all.map(w => w.s), ...items.map(i => i.s)) / 60) * 60;
@@ -659,6 +705,7 @@ function renderWeek(model, results) {
 /* ---------------- heatmap tab ---------------- */
 let heatSel = null;
 document.getElementById('heatSchool').addEventListener('change', () => { heatSel = null; renderHeat(); });
+document.getElementById('heatLen').addEventListener('change', () => { heatSel = null; renderHeat(); });
 function renderHeat() {
   const sel = document.getElementById('heatSchool');
   const names = schoolNames(), prev = sel.value;
@@ -669,14 +716,19 @@ function renderHeat() {
   const model = buildModel();
   const sc = model.schools.find(s => s.name === sel.value);
   const total = sc.members.length;
-  const byKey = Object.fromEntries(sc.candidates.map(c => [c.key, c]));
-  const starts = [...new Set(sc.candidates.map(c => c.s))].sort((a, b) => a - b);
+  const lenSel = document.getElementById('heatLen'), lens = [...new Set(sc.durs)].sort((a, b) => a - b), prevLen = +lenSel.value;
+  lenSel.innerHTML = lens.map(D => `<option value="${D}">${D}분</option>`).join('');
+  lenSel.value = lens.includes(prevLen) ? prevLen : sc.durs[0];
+  lenSel.hidden = document.getElementById('heatLenLabel').hidden = lens.length < 2;
+  const D = +lenSel.value, list = sc.cands[D];
+  const byKey = Object.fromEntries(list.map(c => [c.key, c]));
+  const starts = [...new Set(list.map(c => c.s))].sort((a, b) => a - b);
   if (!starts.length) { wrap.innerHTML = '<p class="empty-note">학원 수업 가능 시간이 없어요.</p>'; detail.innerHTML = ''; return; }
   const color = schoolColor(sc.name);
   let html = `<table class="heat"><tr><th>시작</th>${DAYS.map(d => `<th>${d}</th>`).join('')}</tr>`;
   starts.forEach(t => {
     html += `<tr><th>${fmt(t)}</th>` + DAYS.map((_, d) => {
-      const c = byKey[d + '-' + t];
+      const c = byKey[`${d}-${t}-${D}`];
       if (!c) return '<td class="closed">·</td>';
       const ratio = total ? c.avail.length / total : 0;
       const bg = ratio === 1 ? color : `color-mix(in srgb, ${color} ${Math.round(ratio * 70)}%, #fff)`;
@@ -719,7 +771,7 @@ document.getElementById('btnSample').addEventListener('click', () => {
   state.schoolCfg = {
     '대치중': { arrive: '16:20', weekendArrive: '09:00', sessions: '' },
     '단대부중': { arrive: '16:40', weekendArrive: '09:00', sessions: '', duration: '60' },
-    '휘문중': { arrive: '16:10', weekendArrive: '09:00', sessions: '3', duration: '120' },
+    '휘문중': { arrive: '16:10', weekendArrive: '09:00', sessions: '3', duration: '90, 90, 180' },
   };
   state.students = [
     S('김민수', '대치중', '월수 17:00-19:00 수학학원 이동15\n화목 18:00-20:00 영어학원'),
@@ -735,6 +787,37 @@ document.getElementById('btnSample').addEventListener('click', () => {
     S('오지호', '휘문중', '평일 17:00-18:00 태권도 이동5\n수 19:00-21:00 수학'),
   ];
   save(); updateCount(); showTab('result');
+});
+
+/* ---------------- install as app (PWA) ---------------- */
+const installBar = document.getElementById('installBar');
+const isStandalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+const isOnline = location.protocol.startsWith('http');
+let installPrompt = null;
+function hideInstallBarForever() { try { localStorage.setItem('installBarHidden', '1'); } catch (e) { /* ignore */ } installBar.classList.remove('show'); }
+function installBarHidden() { try { return localStorage.getItem('installBarHidden') === '1'; } catch (e) { return false; } }
+if (isOnline && 'serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+if (isOnline && !isStandalone && !installBarHidden()) {
+  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  if (isIOS) document.getElementById('installText').textContent = '📲 아이폰·아이패드: Safari 아래쪽 공유 버튼(□↑) → "홈 화면에 추가"를 누르면 앱처럼 설치돼요.';
+  document.getElementById('btnCopyLink').hidden = !navigator.clipboard;
+  installBar.classList.add('show');
+}
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault(); installPrompt = e;
+  document.getElementById('btnInstall').hidden = false;
+});
+document.getElementById('btnInstall').addEventListener('click', async () => {
+  if (!installPrompt) return;
+  installPrompt.prompt();
+  const { outcome } = await installPrompt.userChoice;
+  installPrompt = null;
+  if (outcome === 'accepted') hideInstallBarForever();
+});
+window.addEventListener('appinstalled', hideInstallBarForever);
+document.getElementById('btnHideInstall').addEventListener('click', hideInstallBarForever);
+document.getElementById('btnCopyLink').addEventListener('click', () => {
+  navigator.clipboard.writeText(location.origin + location.pathname).then(() => alert('링크를 복사했어요. 카톡 등으로 보내주세요.'));
 });
 
 /* ---------------- init ---------------- */
